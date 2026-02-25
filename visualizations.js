@@ -1843,7 +1843,6 @@
     }
 
     // ---- Drawing ----
-    const CELL_NAMES = ['top-left', 'top-mid', 'top-right', 'mid-left', 'center', 'mid-right', 'bot-left', 'bot-mid', 'bot-right'];
     const CELL_SHORT = ['TL', 'TC', 'TR', 'ML', 'C', 'MR', 'BL', 'BC', 'BR'];
 
     function drawBoard() {
@@ -1851,55 +1850,15 @@
         ctx.fillStyle = '#111';
         ctx.fillRect(BX - 5, BY - 5, CELL * 3 + 10, CELL * 3 + 10);
 
-        // Get move stats for overlay
-        let moveStats = {};
-        let maxVisits = 1;
-        let bestMove = -1;
-        if (lastMCTSRoot && showingAnalysis) {
-            for (const ch of lastMCTSRoot.children) {
-                moveStats[ch.move] = { visits: ch.visits, winRate: ch.visits > 0 ? ch.wins / ch.visits : 0 };
-                if (ch.visits > maxVisits) { maxVisits = ch.visits; bestMove = ch.move; }
-            }
-        }
-
         for (let i = 0; i < 9; i++) {
             const r = Math.floor(i / 3), c = i % 3;
             const x = BX + c * CELL, y = BY + r * CELL;
 
-            // Cell background with visit-count heat
-            if (board[i] === 0 && moveStats[i]) {
-                const intensity = moveStats[i].visits / maxVisits;
-                ctx.fillStyle = `rgba(0, 229, 255, ${intensity * 0.3})`;
-            } else {
-                ctx.fillStyle = '#0a0a0a';
-            }
+            ctx.fillStyle = '#0a0a0a';
             ctx.fillRect(x + 1, y + 1, CELL - 2, CELL - 2);
-
-            // Highlight best move
-            if (i === bestMove && showingAnalysis) {
-                ctx.strokeStyle = '#00e5ff';
-                ctx.lineWidth = 2;
-                ctx.shadowBlur = 6; ctx.shadowColor = '#00e5ff';
-                ctx.strokeRect(x + 2, y + 2, CELL - 4, CELL - 4);
-                ctx.shadowBlur = 0;
-            }
-
             ctx.strokeStyle = '#333';
             ctx.lineWidth = 1;
             ctx.strokeRect(x, y, CELL, CELL);
-
-            // Visit count overlay on empty cells
-            if (board[i] === 0 && moveStats[i] && moveStats[i].visits > 0) {
-                const ms = moveStats[i];
-                ctx.font = 'bold 11px Courier New';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillStyle = `rgba(0, 229, 255, ${0.4 + (ms.visits / maxVisits) * 0.6})`;
-                ctx.fillText(ms.visits, x + CELL / 2, y + CELL / 2 - 6);
-                ctx.font = '9px Courier New';
-                ctx.fillStyle = '#888';
-                ctx.fillText(Math.floor(ms.winRate * 100) + '%', x + CELL / 2, y + CELL / 2 + 8);
-            }
 
             // Pieces
             if (board[i] === 1) {
@@ -1945,130 +1904,301 @@
         ctx.fillText(statusMsg, BX + CELL * 1.5, BY + CELL * 3 + 22);
     }
 
+    // ---- Animated MCTS Phase Visualization ----
+    let phaseAnimTime = 0;
+    const PHASE_DURATION = 2000; // ms per phase
+    const TOTAL_CYCLE = PHASE_DURATION * 4;
+    let lastAnimFrame = 0;
+
+    // Example tree nodes for the phase diagram
+    // Fixed positions for a small illustrative tree
+    const exTree = {
+        // Root
+        root: { x: 0.5, y: 0.08 },
+        // Level 1 children
+        L1: [
+            { x: 0.18, y: 0.36, v: 42, w: 18, label: 'A' },
+            { x: 0.5, y: 0.36, v: 85, w: 45, label: 'B' },
+            { x: 0.82, y: 0.36, v: 31, w: 12, label: 'C' }
+        ],
+        // Level 2 children (under B, the most-visited)
+        L2: [
+            { x: 0.35, y: 0.64, v: 30, w: 16, label: 'B1' },
+            { x: 0.5, y: 0.64, v: 40, w: 22, label: 'B2' },
+            { x: 0.65, y: 0.64, v: 15, w: 7, label: 'B3' }
+        ],
+        // The new node to expand (under B3)
+        newNode: { x: 0.65, y: 0.88, v: 0, w: 0, label: '?' }
+    };
+
+    // The path for SELECT: root -> B -> B3
+    const selectPath = [0, 1, 2]; // indices: root, L1[1]=B, L2[2]=B3
+
+    function startPhaseAnim() {
+        phaseAnimTime = 0;
+        lastAnimFrame = performance.now();
+        animatePhases();
+    }
+
+    function animatePhases() {
+        const now = performance.now();
+        const dt = now - lastAnimFrame;
+        lastAnimFrame = now;
+        phaseAnimTime = (phaseAnimTime + dt) % TOTAL_CYCLE;
+        draw();
+        requestAnimationFrame(animatePhases);
+    }
+
     function drawPanel() {
-        // Panel background (top zone only)
+        // Panel background
         ctx.fillStyle = '#0a0a0a';
         ctx.fillRect(PANEL_X, 8, PANEL_W, TOP_H - 16);
         ctx.strokeStyle = '#222';
         ctx.lineWidth = 1;
         ctx.strokeRect(PANEL_X, 8, PANEL_W, TOP_H - 16);
 
-        // ---- MCTS Phase Diagram ----
-        const phaseY = 22;
-        ctx.font = 'bold 9px Courier New';
-        ctx.textAlign = 'center';
-        ctx.fillStyle = '#555';
-        ctx.fillText('MCTS ALGORITHM', PANEL_X + PANEL_W / 2, phaseY);
+        const activePhase = Math.floor(phaseAnimTime / PHASE_DURATION);
+        const phaseProgress = (phaseAnimTime % PHASE_DURATION) / PHASE_DURATION;
 
         const phases = [
-            { name: 'SELECT', desc: 'Pick best path', color: '#ff0055' },
-            { name: 'EXPAND', desc: 'Add new node', color: '#ffaa00' },
-            { name: 'EVALUATE', desc: 'Simulate game', color: '#00e5ff' },
-            { name: 'BACKUP', desc: 'Update scores', color: '#00ff88' }
+            { name: 'SELECT', desc: 'Follow best path down', color: '#ff0055' },
+            { name: 'EXPAND', desc: 'Add a new child node', color: '#ffaa00' },
+            { name: 'SIMULATE', desc: 'Play random game out', color: '#00e5ff' },
+            { name: 'BACKUP', desc: 'Update scores upward', color: '#00ff88' }
         ];
 
+        // Phase step indicators at top
+        const stepY = 18;
         const phaseW = (PANEL_W - 20) / 4;
         for (let i = 0; i < 4; i++) {
             const px = PANEL_X + 10 + i * phaseW;
-            const py = phaseY + 10;
+            const isActive = i === activePhase;
 
-            // Phase box
             ctx.fillStyle = phases[i].color;
-            ctx.globalAlpha = 0.15;
-            ctx.fillRect(px + 2, py, phaseW - 4, 32);
+            ctx.globalAlpha = isActive ? 0.3 : 0.08;
+            ctx.fillRect(px + 2, stepY, phaseW - 4, 28);
             ctx.globalAlpha = 1;
             ctx.strokeStyle = phases[i].color;
-            ctx.lineWidth = 1;
-            ctx.strokeRect(px + 2, py, phaseW - 4, 32);
+            ctx.lineWidth = isActive ? 2 : 0.5;
+            ctx.strokeRect(px + 2, stepY, phaseW - 4, 28);
 
-            // Phase label
-            ctx.font = 'bold 8px Courier New';
-            ctx.fillStyle = phases[i].color;
+            ctx.font = isActive ? 'bold 8px Courier New' : '7px Courier New';
+            ctx.fillStyle = isActive ? phases[i].color : '#666';
             ctx.textAlign = 'center';
-            ctx.fillText(phases[i].name, px + phaseW / 2, py + 13);
+            ctx.fillText(phases[i].name, px + phaseW / 2, stepY + 12);
 
-            ctx.font = '7px Courier New';
-            ctx.fillStyle = '#888';
-            ctx.fillText(phases[i].desc, px + phaseW / 2, py + 25);
+            if (isActive) {
+                ctx.font = '6px Courier New';
+                ctx.fillStyle = '#aaa';
+                ctx.fillText(phases[i].desc, px + phaseW / 2, stepY + 22);
+            }
 
-            // Arrow between phases
             if (i < 3) {
-                ctx.fillStyle = '#555';
-                ctx.font = '10px sans-serif';
-                ctx.fillText('→', px + phaseW - 1, py + 16);
+                ctx.fillStyle = '#444';
+                ctx.font = '9px sans-serif';
+                ctx.fillText('→', px + phaseW - 1, stepY + 14);
             }
         }
 
-        // Circular arrow from BACKUP back to SELECT
-        ctx.font = '8px Courier New';
-        ctx.fillStyle = '#555';
-        ctx.textAlign = 'center';
-        ctx.fillText('↻ repeat 1000×', PANEL_X + PANEL_W / 2, phaseY + 52);
+        // ---- Draw the example tree ----
+        const treeArea = {
+            x: PANEL_X + 12,
+            y: stepY + 38,
+            w: PANEL_W - 24,
+            h: TOP_H - stepY - 60
+        };
 
-        // ---- Bar Chart of Move Evaluations ----
-        const chartY = phaseY + 68;
-        const chartH = TOP_H - chartY - 30;
+        function tx(frac) { return treeArea.x + frac * treeArea.w; }
+        function ty(frac) { return treeArea.y + frac * treeArea.h; }
 
-        ctx.font = '9px Courier New';
-        ctx.fillStyle = '#555';
-        ctx.textAlign = 'center';
-        ctx.fillText('MOVE EVALUATIONS', PANEL_X + PANEL_W / 2, chartY - 4);
-
-        if (!lastMCTSRoot || !showingAnalysis || lastMCTSRoot.children.length === 0) {
-            ctx.fillStyle = '#333';
-            ctx.font = '10px Courier New';
-            ctx.textAlign = 'center';
-            ctx.fillText('Make a move, then click', PANEL_X + PANEL_W / 2, chartY + chartH / 2 - 6);
-            ctx.fillText('SHOW AI THINKING', PANEL_X + PANEL_W / 2, chartY + chartH / 2 + 10);
-            return;
+        // Draw an edge
+        function drawEdge(x1, y1, x2, y2, color, width, alpha) {
+            ctx.strokeStyle = color;
+            ctx.globalAlpha = alpha;
+            ctx.lineWidth = width;
+            ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+            ctx.globalAlpha = 1;
         }
 
-        const root = lastMCTSRoot;
-        const children = root.children.slice().sort((a, b) => b.visits - a.visits);
-        const maxV = Math.max(1, ...children.map(c => c.visits));
-        const barW = Math.min(28, (PANEL_W - 30) / children.length - 4);
-        const totalBarWidth = children.length * (barW + 4);
-        const startX = PANEL_X + (PANEL_W - totalBarWidth) / 2;
-
-        for (let i = 0; i < children.length; i++) {
-            const ch = children[i];
-            const bx = startX + i * (barW + 4);
-            const barH = (ch.visits / maxV) * (chartH - 30);
-            const barY = chartY + chartH - 18 - barH;
-            const winRate = ch.visits > 0 ? ch.wins / ch.visits : 0;
-
-            const g = Math.floor(winRate * 200 + 55);
-            const r = Math.floor((1 - winRate) * 200 + 55);
-            ctx.fillStyle = `rgb(${r}, ${g}, 80)`;
-            ctx.shadowBlur = 3; ctx.shadowColor = `rgb(${r}, ${g}, 80)`;
-            ctx.fillRect(bx, barY, barW, barH);
+        // Draw a node circle
+        function drawNode(x, y, radius, fillColor, strokeColor, label, visits, glow) {
+            if (glow) {
+                ctx.shadowBlur = 8; ctx.shadowColor = glow;
+            }
+            ctx.fillStyle = fillColor;
+            ctx.beginPath(); ctx.arc(x, y, radius, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = strokeColor;
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
             ctx.shadowBlur = 0;
 
-            if (ch.visits === maxV) {
-                ctx.fillStyle = '#00e5ff';
-                ctx.font = 'bold 10px sans-serif';
+            if (label) {
+                ctx.font = 'bold 9px Courier New';
+                ctx.fillStyle = '#ddd';
                 ctx.textAlign = 'center';
-                ctx.fillText('★', bx + barW / 2, barY - 6);
+                ctx.textBaseline = 'middle';
+                ctx.fillText(label, x, y);
             }
-
-            ctx.font = '7px Courier New';
-            ctx.fillStyle = '#ccc';
-            ctx.textAlign = 'center';
-            if (barH > 15) ctx.fillText(ch.visits, bx + barW / 2, barY + 10);
-
-            ctx.font = '8px Courier New';
-            ctx.fillStyle = '#888';
-            ctx.fillText(CELL_SHORT[ch.move], bx + barW / 2, chartY + chartH - 4);
-
-            ctx.font = '7px Courier New';
-            ctx.fillStyle = '#666';
-            ctx.fillText(Math.floor(winRate * 100) + '%', bx + barW / 2, chartY + chartH + 7);
+            if (visits !== undefined) {
+                ctx.font = '7px Courier New';
+                ctx.fillStyle = '#888';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'alphabetic';
+                ctx.fillText(visits, x, y + radius + 10);
+            }
         }
 
+        // Positions
+        const rootPos = { x: tx(exTree.root.x), y: ty(exTree.root.y) };
+        const l1Pos = exTree.L1.map(n => ({ x: tx(n.x), y: ty(n.y) }));
+        const l2Pos = exTree.L2.map(n => ({ x: tx(n.x), y: ty(n.y) }));
+        const newPos = { x: tx(exTree.newNode.x), y: ty(exTree.newNode.y) };
+
+        // Edges: root -> L1
+        for (let i = 0; i < 3; i++) {
+            const isOnPath = (activePhase === 0 && i === 1) || (activePhase >= 1 && i === 1);
+            const alpha = isOnPath ? 0.8 : 0.2;
+            const w = isOnPath ? 2.5 : 1;
+            const col = (activePhase === 0 && i === 1) ? '#ff0055' : '#00e5ff';
+            drawEdge(rootPos.x, rootPos.y + 10, l1Pos[i].x, l1Pos[i].y - 10, col, w, alpha);
+        }
+
+        // Edges: B -> L2
+        for (let i = 0; i < 3; i++) {
+            const isOnPath = (activePhase === 0 && i === 2) || (activePhase >= 1 && i === 2);
+            const alpha = isOnPath ? 0.8 : 0.2;
+            const w = isOnPath ? 2.5 : 1;
+            const col = (activePhase === 0 && i === 2) ? '#ff0055' : '#00e5ff';
+            drawEdge(l1Pos[1].x, l1Pos[1].y + 10, l2Pos[i].x, l2Pos[i].y - 10, col, w, alpha);
+        }
+
+        // Phase-specific visuals
+        if (activePhase === 0) {
+            // SELECT — highlight path root -> B -> B3 with animated pulse
+            const pulse = 0.6 + 0.4 * Math.sin(phaseProgress * Math.PI * 4);
+
+            // Draw pulsing markers along the path
+            const pathPoints = [rootPos, l1Pos[1], l2Pos[2]];
+            const segProgress = Math.min(1, phaseProgress * 1.5); // speed up
+            for (let i = 0; i < pathPoints.length - 1; i++) {
+                const seg = i / (pathPoints.length - 1);
+                if (segProgress > seg) {
+                    const p1 = pathPoints[i], p2 = pathPoints[i + 1];
+                    const t = Math.min(1, (segProgress - seg) * (pathPoints.length - 1));
+                    const mx = p1.x + (p2.x - p1.x) * t;
+                    const my = p1.y + (p2.y - p1.y) * t;
+                    ctx.fillStyle = `rgba(255, 0, 85, ${pulse})`;
+                    ctx.beginPath(); ctx.arc(mx, my, 4, 0, Math.PI * 2); ctx.fill();
+                }
+            }
+        }
+
+        if (activePhase === 1) {
+            // EXPAND — draw edge from B3 to new node with growth animation
+            const grow = Math.min(1, phaseProgress * 2);
+            const ex = l2Pos[2].x + (newPos.x - l2Pos[2].x) * grow;
+            const ey = l2Pos[2].y + 10 + (newPos.y - 10 - l2Pos[2].y - 10) * grow;
+            drawEdge(l2Pos[2].x, l2Pos[2].y + 10, ex, ey, '#ffaa00', 2, 0.8);
+
+            if (grow > 0.5) {
+                const nodeAlpha = (grow - 0.5) * 2;
+                const pulseR = 10 + Math.sin(phaseProgress * Math.PI * 6) * 3;
+                ctx.globalAlpha = nodeAlpha;
+                drawNode(newPos.x, newPos.y, pulseR, '#2a1a00', '#ffaa00', '?', undefined, '#ffaa00');
+                ctx.globalAlpha = 1;
+            }
+        }
+
+        if (activePhase === 2) {
+            // SIMULATE — show new node + random rollout symbols
+            drawEdge(l2Pos[2].x, l2Pos[2].y + 10, newPos.x, newPos.y - 10, '#ffaa00', 1.5, 0.5);
+            drawNode(newPos.x, newPos.y, 10, '#2a1a00', '#ffaa00', '?', undefined, null);
+
+            // Simulate random play symbols appearing below the new node
+            const simY = newPos.y + 20;
+            const symbols = ['X', 'O', 'X', 'O', 'X'];
+            const numShow = Math.floor(phaseProgress * 5) + 1;
+            for (let i = 0; i < Math.min(numShow, 5); i++) {
+                ctx.font = '9px Courier New';
+                ctx.fillStyle = symbols[i] === 'X' ? '#ff0055' : '#00e5ff';
+                ctx.textAlign = 'center';
+                ctx.globalAlpha = 0.6 + 0.4 * Math.sin(phaseProgress * Math.PI * 3 + i);
+                ctx.fillText(symbols[i], newPos.x - 20 + i * 10, simY + 4);
+            }
+            ctx.globalAlpha = 1;
+
+            // Result indicator
+            if (phaseProgress > 0.7) {
+                const resultAlpha = (phaseProgress - 0.7) / 0.3;
+                ctx.globalAlpha = resultAlpha;
+                ctx.font = 'bold 10px Courier New';
+                ctx.fillStyle = '#00ff88';
+                ctx.textAlign = 'center';
+                ctx.fillText('WIN', newPos.x, simY + 18);
+                ctx.globalAlpha = 1;
+            }
+        }
+
+        if (activePhase === 3) {
+            // BACKUP — show values propagating back up
+            drawEdge(l2Pos[2].x, l2Pos[2].y + 10, newPos.x, newPos.y - 10, '#ffaa00', 1.5, 0.3);
+            drawNode(newPos.x, newPos.y, 10, '#2a1a00', '#ffaa00', '?', undefined, null);
+
+            // Animated arrows going UP from new node -> B3 -> B -> root
+            const backPath = [newPos, l2Pos[2], l1Pos[1], rootPos];
+            const upProgress = Math.min(1, phaseProgress * 1.3);
+
+            for (let i = 0; i < backPath.length - 1; i++) {
+                const seg = i / (backPath.length - 1);
+                if (upProgress > seg) {
+                    const p1 = backPath[i], p2 = backPath[i + 1];
+                    const t = Math.min(1, (upProgress - seg) * (backPath.length - 1));
+                    const mx = p1.x + (p2.x - p1.x) * t;
+                    const my = p1.y + (p2.y - p1.y) * t;
+
+                    // Green glow moving up
+                    ctx.fillStyle = '#00ff88';
+                    ctx.shadowBlur = 6; ctx.shadowColor = '#00ff88';
+                    ctx.beginPath(); ctx.arc(mx, my, 5, 0, Math.PI * 2); ctx.fill();
+                    ctx.shadowBlur = 0;
+
+                    // +1 label near the moving dot
+                    ctx.font = 'bold 8px Courier New';
+                    ctx.fillStyle = '#00ff88';
+                    ctx.textAlign = 'left';
+                    ctx.fillText('+1', mx + 8, my - 2);
+                }
+            }
+        }
+
+        // Draw all base nodes (always visible)
+        // Root
+        drawNode(rootPos.x, rootPos.y, 12, '#1a1a2e', '#888',
+            '⬤', 158, activePhase === 0 && phaseProgress < 0.2 ? '#ff0055' : null);
+
+        // L1
+        for (let i = 0; i < 3; i++) {
+            const n = exTree.L1[i];
+            const isOnPath = i === 1;
+            const glow = (activePhase === 0 && isOnPath) ? '#ff0055' : null;
+            drawNode(l1Pos[i].x, l1Pos[i].y, 10, '#1a1a2e',
+                isOnPath ? '#00e5ff' : '#555', n.label, n.v, glow);
+        }
+
+        // L2
+        for (let i = 0; i < 3; i++) {
+            const n = exTree.L2[i];
+            const isOnPath = i === 2;
+            const glow = (activePhase === 0 && isOnPath) ? '#ff0055' : null;
+            drawNode(l2Pos[i].x, l2Pos[i].y, 8, '#1a1a2e',
+                isOnPath ? '#00e5ff' : '#555', n.label, n.v, glow);
+        }
+
+        // Phase description at bottom
         ctx.font = '8px Courier New';
         ctx.fillStyle = '#555';
-        ctx.textAlign = 'left';
-        ctx.fillText(`${root.visits} simulations`, PANEL_X + 8, TOP_H - 18);
+        ctx.textAlign = 'center';
+        ctx.fillText('↻ repeat × 1000', PANEL_X + PANEL_W / 2, TOP_H - 16);
     }
 
     // ---- Search Tree ----
@@ -2287,7 +2417,7 @@
         draw();
     });
 
-    draw();
+    startPhaseAnim();
 })();
 
 // ==========================================
