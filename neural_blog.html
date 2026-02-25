@@ -5,8 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description"
-        content="The ultimate interactive guide to neural networks, built from absolute first principles. Explore gradient descent, backpropagation, CNNs, Transformers, generative AI, and latent spaces through hands-on visualizations.">
-    <title>Neural Networks: First Principles — The Ultimate Interactive Guide</title>
+        content="The ultimate interactive guide to artificial intelligence, built from absolute first principles. Explore neural networks, gradient descent, backpropagation, CNNs, Transformers, reinforcement learning, generative AI, and latent spaces through hands-on visualizations.">
+    <title>Artificial Intelligence: First Principles — The Ultimate Interactive Guide</title>
 
     <script src="https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.css">
@@ -19,7 +19,7 @@
 
 <body>
 
-    <h1>Neural Networks</h1>
+    <h1>Artificial Intelligence</h1>
 
     <div class="intro-canvas-container">
         <canvas id="introCanvas" class="intro-canvas" width="800" height="300"></canvas>
@@ -52,6 +52,7 @@
             <li><a href="#sec-attention">The Attention Mechanism</a></li>
             <li><a href="#sec-overfit">The Memorization Problem</a></li>
             <li><a href="#sec-ssl">Teaching Without a Teacher</a></li>
+            <li><a href="#sec-rl">Learning by Doing (Reinforcement Learning)</a></li>
             <li><a href="#sec-genai">Dreaming Machines (GenAI)</a></li>
             <li><a href="#sec-latent">The Space Between (Manifolds)</a></li>
             <li><a href="#sec-illusion">The Illusion of Intelligence</a></li>
@@ -427,8 +428,53 @@
         what the clean version looks like—the "label" is just the original image before noise was added. This is
         self-supervised learning applied to pixels instead of words.</p>
 
+    <span class="section-tag tag-advanced">ADVANCED</span>
+    <h2 id="sec-rl">12. Learning by Doing (Reinforcement Learning)</h2>
+    <p>Supervised learning needs labels. Self-supervised learning extracts labels from the data itself. But what about
+        problems where there <em>is</em> no dataset at all—just an environment you can interact with?</p>
+
+    <p>Consider teaching a robot to walk, or training an AI to play chess. There is no spreadsheet of "correct moves."
+        Instead, the agent must <strong>explore</strong> the world, take actions, and learn from the
+        <strong>rewards</strong> and <strong>penalties</strong> it receives. This is <strong>Reinforcement
+            Learning (RL)</strong>.
+    </p>
+
+    <p>The core loop is deceptively simple: the agent observes a <strong>state</strong>, chooses an
+        <strong>action</strong>, receives a <strong>reward</strong>, and arrives at a new state. Over thousands of
+        episodes, it builds a <strong>Q-Table</strong>—a mental map of "how valuable is each action in each state?"—and
+        learns to pick the actions that maximize long-term reward.
+    </p>
+
+    <p>The key tension in RL is <strong>exploration vs. exploitation</strong>. Should the agent try a new, unknown path
+        (explore), or stick with the best path it has found so far (exploit)? Too much exploration wastes time; too
+        little causes the agent to get stuck in a suboptimal strategy forever.</p>
+
+    <div class="interactive-container" style="min-height: 480px; padding-bottom: 2rem;">
+        <canvas id="rlCanvas" width="600" height="340"></canvas>
+        <div class="controls">
+            <div class="slider-group" style="width: 100%;">
+                <label>EXPLORATION RATE (ε): <span id="rl-eps-val">0.30</span></label>
+                <input type="range" id="rl-eps-slider" min="0" max="100" step="1" value="30" style="width: 300px;">
+            </div>
+            <button id="rl-step-btn">STEP (1 EPISODE)</button>
+            <button id="rl-train-btn" style="background:#222; color:#00e5ff; border: 1px solid #00e5ff;">TRAIN 100
+                EPISODES</button>
+            <button id="rl-reset-btn" style="background:#333; color:#fff;">RESET</button>
+        </div>
+        <p
+            style="font-size: 0.9rem; color: #888; text-align: center; margin-top: 1rem; font-family: 'Courier New', monospace;">
+            Watch the agent (cyan dot) learn to navigate a grid to reach the goal (green). Walls are dark.
+            Adjust ε to control how much the agent explores vs. exploits its learned strategy.
+        </p>
+    </div>
+
+    <p>Reinforcement learning is behind many of AI's most stunning achievements: AlphaGo defeating the world champion
+        at Go, robotic arms learning to grasp objects, and AI agents mastering video games from raw pixels. When
+        combined with deep neural networks (Deep RL), the Q-Table is replaced by a neural network that can generalize
+        across millions of possible states—turning brute-force memorization into genuine strategic reasoning.</p>
+
     <span class="section-tag tag-generative">GENERATIVE</span>
-    <h2 id="sec-genai">12. Dreaming Machines (Generative AI)</h2>
+    <h2 id="sec-genai">13. Dreaming Machines (Generative AI)</h2>
     <p>Everything up to this point has been discriminative AI: looking at data and assigning it a boundary or a
         probability. But what happens when we ask the network to generate brand new data? This is Generative AI.</p>
 
@@ -462,7 +508,7 @@
     </div>
 
     <span class="section-tag tag-generative">GENERATIVE</span>
-    <h2 id="sec-latent">13. The Space Between (Manifolds &amp; Latent Spaces)</h2>
+    <h2 id="sec-latent">14. The Space Between (Manifolds &amp; Latent Spaces)</h2>
     <p>We've talked about how neural networks fold space and generate data, but <em>where</em> does that data come from?
         When a model like Midjourney turns text into an image, it isn't pulling from a database; it's navigating a
         <strong>Latent Space</strong>.
@@ -504,7 +550,7 @@
     </p>
 
     <span class="section-tag">PHILOSOPHY</span>
-    <h2 id="sec-illusion">14. The Illusion of Intelligence</h2>
+    <h2 id="sec-illusion">15. The Illusion of Intelligence</h2>
     <p>What is a Neural Network, truly? We have seen that it is not a brain. It does not "think." It is purely a
         parametric mathematical function. It is nothing more than a series of matrix multiplications interspersed with
         simple, non-linear hinges.</p>

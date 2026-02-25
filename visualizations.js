@@ -1067,7 +1067,280 @@
 })();
 
 // ==========================================
-// 12. DREAMING MACHINES (REVERSE DIFFUSION)
+// 12. REINFORCEMENT LEARNING (Q-LEARNING GRIDWORLD)
+// ==========================================
+(function () {
+    const canvas = document.getElementById('rlCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const epsSlider = document.getElementById('rl-eps-slider');
+    const epsVal = document.getElementById('rl-eps-val');
+    const stepBtn = document.getElementById('rl-step-btn');
+    const trainBtn = document.getElementById('rl-train-btn');
+    const resetBtn = document.getElementById('rl-reset-btn');
+
+    const ROWS = 6, COLS = 8;
+    const CELL = Math.min(Math.floor((canvas.width - 40) / COLS), Math.floor((canvas.height - 60) / ROWS));
+    const offsetX = Math.floor((canvas.width - COLS * CELL) / 2);
+    const offsetY = 30;
+
+    // Actions: 0=up, 1=right, 2=down, 3=left
+    const DR = [-1, 0, 1, 0], DC = [0, 1, 0, -1];
+    const ACTION_SYMS = ['↑', '→', '↓', '←'];
+
+    // Grid: 0=open, 1=wall, 2=goal
+    const grid = [];
+    const GOAL = { r: 1, c: COLS - 2 };
+    const START = { r: ROWS - 2, c: 1 };
+
+    function initGrid() {
+        for (let r = 0; r < ROWS; r++) {
+            grid[r] = [];
+            for (let c = 0; c < COLS; c++) {
+                grid[r][c] = 0;
+            }
+        }
+        // Walls
+        const walls = [
+            [1, 3], [2, 3], [3, 3],
+            [3, 5], [2, 5], [1, 5],
+            [0, 0], [0, 1], [0, 2], [0, 3], [0, 4], [0, 5], [0, 6], [0, 7],
+            [5, 0], [5, 1], [5, 2], [5, 3], [5, 4], [5, 5], [5, 6], [5, 7],
+            [1, 0], [2, 0], [3, 0], [4, 0],
+            [1, 7], [2, 7], [3, 7], [4, 7]
+        ];
+        walls.forEach(([r, c]) => { grid[r][c] = 1; });
+        grid[GOAL.r][GOAL.c] = 2;
+    }
+    initGrid();
+
+    // Q-Table: Q[r][c][a] = expected reward
+    let Q = [];
+    let episodeCount = 0;
+    let lastPath = [];
+    const alpha = 0.1, gamma = 0.9;
+
+    function initQ() {
+        Q = [];
+        for (let r = 0; r < ROWS; r++) {
+            Q[r] = [];
+            for (let c = 0; c < COLS; c++) {
+                Q[r][c] = [0, 0, 0, 0];
+            }
+        }
+        episodeCount = 0;
+        lastPath = [];
+    }
+    initQ();
+
+    function getEps() { return parseInt(epsSlider.value) / 100; }
+
+    function chooseAction(r, c, eps) {
+        if (Math.random() < eps) return Math.floor(Math.random() * 4);
+        let best = 0, bestVal = Q[r][c][0];
+        for (let a = 1; a < 4; a++) {
+            if (Q[r][c][a] > bestVal) { bestVal = Q[r][c][a]; best = a; }
+        }
+        return best;
+    }
+
+    function runEpisode(eps) {
+        let r = START.r, c = START.c;
+        let path = [{ r, c }];
+        let steps = 0;
+        const maxSteps = 200;
+
+        while (steps < maxSteps) {
+            const a = chooseAction(r, c, eps);
+            let nr = r + DR[a], nc = c + DC[a];
+
+            // Clamp to bounds + wall check
+            if (nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS || grid[nr][nc] === 1) {
+                nr = r; nc = c;
+            }
+
+            let reward = -0.1; // Small step penalty
+            let done = false;
+            if (grid[nr][nc] === 2) { reward = 10; done = true; }
+            if (nr === r && nc === c) { reward = -0.5; } // wall bump penalty
+
+            // Q-update
+            let maxNextQ = 0;
+            if (!done) {
+                maxNextQ = Math.max(...Q[nr][nc]);
+            }
+            Q[r][c][a] += alpha * (reward + gamma * maxNextQ - Q[r][c][a]);
+
+            r = nr; c = nc;
+            path.push({ r, c });
+            steps++;
+            if (done) break;
+        }
+
+        episodeCount++;
+        return path;
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Title
+        ctx.fillStyle = '#888';
+        ctx.font = '12px Courier New';
+        ctx.textAlign = 'center';
+        ctx.fillText(`EPISODE: ${episodeCount}`, canvas.width / 2, 18);
+
+        // Draw grid
+        for (let r = 0; r < ROWS; r++) {
+            for (let c = 0; c < COLS; c++) {
+                const x = offsetX + c * CELL;
+                const y = offsetY + r * CELL;
+
+                // Cell fill
+                if (grid[r][c] === 1) {
+                    ctx.fillStyle = '#1a1a1a';
+                } else if (grid[r][c] === 2) {
+                    ctx.fillStyle = '#004d00';
+                } else {
+                    // Heatmap based on best Q-value
+                    const maxQ = Math.max(...Q[r][c]);
+                    const intensity = Math.min(1, Math.max(0, maxQ / 10));
+                    ctx.fillStyle = `rgba(0, 229, 255, ${intensity * 0.25})`;
+                }
+                ctx.fillRect(x, y, CELL, CELL);
+
+                // Cell border
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(x, y, CELL, CELL);
+
+                // Draw Q-value arrows for open cells
+                if (grid[r][c] === 0 && episodeCount > 0) {
+                    const bestA = Q[r][c].indexOf(Math.max(...Q[r][c]));
+                    const maxQ = Math.max(...Q[r][c]);
+                    if (maxQ > 0.01) {
+                        ctx.fillStyle = `rgba(0, 229, 255, ${Math.min(1, maxQ / 5)})`;
+                        ctx.font = `${Math.floor(CELL * 0.5)}px sans-serif`;
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText(ACTION_SYMS[bestA], x + CELL / 2, y + CELL / 2);
+                    }
+                }
+
+                // Goal marker
+                if (grid[r][c] === 2) {
+                    ctx.fillStyle = '#00ff88';
+                    ctx.font = `bold ${Math.floor(CELL * 0.5)}px Courier New`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('★', x + CELL / 2, y + CELL / 2);
+                    ctx.shadowBlur = 10; ctx.shadowColor = '#00ff88';
+                    ctx.fillText('★', x + CELL / 2, y + CELL / 2);
+                    ctx.shadowBlur = 0;
+                }
+            }
+        }
+
+        // Draw last path
+        if (lastPath.length > 1) {
+            ctx.strokeStyle = 'rgba(255, 0, 85, 0.5)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(
+                offsetX + lastPath[0].c * CELL + CELL / 2,
+                offsetY + lastPath[0].r * CELL + CELL / 2
+            );
+            for (let i = 1; i < lastPath.length; i++) {
+                ctx.lineTo(
+                    offsetX + lastPath[i].c * CELL + CELL / 2,
+                    offsetY + lastPath[i].r * CELL + CELL / 2
+                );
+            }
+            ctx.stroke();
+        }
+
+        // Draw agent at start
+        const agentPos = lastPath.length > 0 ? lastPath[lastPath.length - 1] : START;
+        const ax = offsetX + agentPos.c * CELL + CELL / 2;
+        const ay = offsetY + agentPos.r * CELL + CELL / 2;
+        ctx.beginPath();
+        ctx.arc(ax, ay, CELL * 0.25, 0, Math.PI * 2);
+        ctx.fillStyle = '#00e5ff';
+        ctx.fill();
+        ctx.shadowBlur = 10; ctx.shadowColor = '#00e5ff';
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        // Start label
+        const sx = offsetX + START.c * CELL + CELL / 2;
+        const sy = offsetY + START.r * CELL + CELL - 4;
+        ctx.fillStyle = '#ff0055';
+        ctx.font = '9px Courier New';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText('START', sx, sy);
+
+        // Info panel on the right
+        const infoX = offsetX + COLS * CELL + 15;
+        ctx.fillStyle = '#666';
+        ctx.font = '11px Courier New';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        ctx.fillText('Q-LEARNING', infoX, offsetY);
+        ctx.fillStyle = '#888';
+        ctx.font = '10px Courier New';
+        ctx.fillText(`Episodes: ${episodeCount}`, infoX, offsetY + 18);
+        ctx.fillText(`ε: ${getEps().toFixed(2)}`, infoX, offsetY + 33);
+        ctx.fillText(`Path len: ${lastPath.length > 0 ? lastPath.length - 1 : '—'}`, infoX, offsetY + 48);
+
+        // Legend
+        ctx.fillStyle = '#555';
+        ctx.fillText('LEGEND:', infoX, offsetY + 75);
+        ctx.fillStyle = '#00e5ff'; ctx.fillText('● Agent', infoX, offsetY + 92);
+        ctx.fillStyle = '#00ff88'; ctx.fillText('★ Goal', infoX, offsetY + 107);
+        ctx.fillStyle = '#444'; ctx.fillText('■ Wall', infoX, offsetY + 122);
+        ctx.fillStyle = '#ff0055'; ctx.fillText('— Path', infoX, offsetY + 137);
+    }
+
+    // Animate a single episode step by step
+    function animateEpisode(path, idx) {
+        if (idx >= path.length) { draw(); stepBtn.disabled = false; trainBtn.disabled = false; return; }
+        lastPath = path.slice(0, idx + 1);
+        draw();
+        setTimeout(() => animateEpisode(path, idx + 1), Math.max(10, 80 - episodeCount));
+    }
+
+    stepBtn.addEventListener('click', () => {
+        stepBtn.disabled = true; trainBtn.disabled = true;
+        const path = runEpisode(getEps());
+        animateEpisode(path, 0);
+    });
+
+    trainBtn.addEventListener('click', () => {
+        stepBtn.disabled = true; trainBtn.disabled = true;
+        const eps = getEps();
+        for (let i = 0; i < 100; i++) {
+            lastPath = runEpisode(eps);
+        }
+        draw();
+        stepBtn.disabled = false; trainBtn.disabled = false;
+    });
+
+    resetBtn.addEventListener('click', () => {
+        initQ();
+        lastPath = [];
+        draw();
+    });
+
+    epsSlider.addEventListener('input', () => {
+        epsVal.innerText = getEps().toFixed(2);
+    });
+
+    draw();
+})();
+
+// ==========================================
+// 13. DREAMING MACHINES (REVERSE DIFFUSION)
 // ==========================================
 (function () {
     const canvas = document.getElementById('diffusionCanvas');
