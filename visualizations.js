@@ -1340,7 +1340,7 @@
 })();
 
 // ==========================================
-// 13. DEEP Q-NETWORK VISUALIZATION
+// 13. DEEP Q-NETWORK — PONG
 // ==========================================
 (function () {
     const canvas = document.getElementById('dqnCanvas');
@@ -1352,61 +1352,33 @@
 
     const W = canvas.width, H = canvas.height;
 
-    // Grid setup (same layout as RL section)
-    const ROWS = 6, COLS = 8;
-    const GCELL = 28;
-    const gridOffX = W - COLS * GCELL - 20;
-    const gridOffY = 40;
+    // ---- Pong constants ----
+    const GAME_X = 280, GAME_Y = 10;
+    const GW = W - GAME_X - 15, GH = H - 20;
+    const PADDLE_W = 8, PADDLE_H = 50;
+    const BALL_R = 5;
+    const PADDLE_SPEED = 4;
+    const BALL_SPEED = 3;
 
-    const DR = [-1, 0, 1, 0], DC = [0, 1, 0, -1];
-    const ACTION_SYMS = ['↑', '→', '↓', '←'];
-
-    const grid = [];
-    const GOAL = { r: 1, c: COLS - 2 };
-    const START = { r: ROWS - 2, c: 1 };
-
-    function initGrid() {
-        for (let r = 0; r < ROWS; r++) {
-            grid[r] = [];
-            for (let c = 0; c < COLS; c++) grid[r][c] = 0;
-        }
-        const walls = [
-            [1, 3], [2, 3], [3, 3], [3, 5], [2, 5], [1, 5],
-            [0, 0], [0, 1], [0, 2], [0, 3], [0, 4], [0, 5], [0, 6], [0, 7],
-            [5, 0], [5, 1], [5, 2], [5, 3], [5, 4], [5, 5], [5, 6], [5, 7],
-            [1, 0], [2, 0], [3, 0], [4, 0], [1, 7], [2, 7], [3, 7], [4, 7]
-        ];
-        walls.forEach(([r, c]) => { grid[r][c] = 1; });
-        grid[GOAL.r][GOAL.c] = 2;
-    }
-    initGrid();
-
-    // Tiny neural network: 2 inputs (r,c normalized) -> 8 hidden -> 4 outputs (Q per action)
-    const INPUT = 2, HIDDEN = 8, OUTPUT = 4;
+    // ---- Neural Network ----
+    const INPUT = 5, HIDDEN = 16, OUTPUT = 3; // up, stay, down
     let W1, b1, W2, b2;
-    let totalEpisodes = 0;
+    let totalRallies = 0, totalHits = 0;
     let replayBuffer = [];
-    const BUFFER_MAX = 500;
-    const BATCH = 32;
-    const lr = 0.01, gamma = 0.9;
+    const BUFFER_MAX = 3000, BATCH = 32;
+    const lr = 0.01, gamma = 0.95;
 
-    function randW(fan_in, fan_out) {
-        const w = [];
-        const scale = Math.sqrt(2.0 / fan_in);
-        for (let i = 0; i < fan_in; i++) {
-            w[i] = [];
-            for (let j = 0; j < fan_out; j++) w[i][j] = (Math.random() - 0.5) * scale;
-        }
+    function randW(fi, fo) {
+        const w = [], scale = Math.sqrt(2 / fi);
+        for (let i = 0; i < fi; i++) { w[i] = []; for (let j = 0; j < fo; j++) w[i][j] = (Math.random() - 0.5) * scale; }
         return w;
     }
     function zeros(n) { return new Array(n).fill(0); }
 
     function initNetwork() {
-        W1 = randW(INPUT, HIDDEN);
-        b1 = zeros(HIDDEN);
-        W2 = randW(HIDDEN, OUTPUT);
-        b2 = zeros(OUTPUT);
-        totalEpisodes = 0;
+        W1 = randW(INPUT, HIDDEN); b1 = zeros(HIDDEN);
+        W2 = randW(HIDDEN, OUTPUT); b2 = zeros(OUTPUT);
+        totalRallies = 0; totalHits = 0;
         replayBuffer = [];
     }
     initNetwork();
@@ -1414,273 +1386,316 @@
     function relu(x) { return Math.max(0, x); }
 
     function forward(state) {
-        const [r, c] = state;
-        const inp = [r / ROWS, c / COLS];
-        // Hidden layer
+        const inp = [state[0] / GW, state[1] / GH, state[2] / BALL_SPEED, state[3] / BALL_SPEED, state[4] / GH];
         const h = [];
-        for (let j = 0; j < HIDDEN; j++) {
-            let sum = b1[j];
-            for (let i = 0; i < INPUT; i++) sum += inp[i] * W1[i][j];
-            h[j] = relu(sum);
-        }
-        // Output layer
+        for (let j = 0; j < HIDDEN; j++) { let s = b1[j]; for (let i = 0; i < INPUT; i++) s += inp[i] * W1[i][j]; h[j] = relu(s); }
         const out = [];
-        for (let j = 0; j < OUTPUT; j++) {
-            let sum = b2[j];
-            for (let i = 0; i < HIDDEN; i++) sum += h[i] * W2[i][j];
-            out[j] = sum;
-        }
+        for (let j = 0; j < OUTPUT; j++) { let s = b2[j]; for (let i = 0; i < HIDDEN; i++) s += h[i] * W2[i][j]; out[j] = s; }
         return { inp, h, out };
     }
 
-    function chooseAction(state, eps) {
-        if (Math.random() < eps) return Math.floor(Math.random() * 4);
+    function bestAction(state) {
         const { out } = forward(state);
-        let best = 0;
-        for (let a = 1; a < 4; a++) { if (out[a] > out[best]) best = a; }
-        return best;
+        let b = 0;
+        for (let a = 1; a < OUTPUT; a++) if (out[a] > out[b]) b = a;
+        return b;
     }
 
-    function trainOnBatch() {
+    function chooseAction(state, eps) {
+        return Math.random() < eps ? Math.floor(Math.random() * OUTPUT) : bestAction(state);
+    }
+
+    function trainBatch() {
         if (replayBuffer.length < BATCH) return;
-        // Sample random batch
         const batch = [];
-        for (let i = 0; i < BATCH; i++) {
-            batch.push(replayBuffer[Math.floor(Math.random() * replayBuffer.length)]);
-        }
+        for (let i = 0; i < BATCH; i++) batch.push(replayBuffer[Math.floor(Math.random() * replayBuffer.length)]);
 
         for (const [s, a, r, ns, done] of batch) {
             const fwd = forward(s);
             let target = r;
-            if (!done) {
-                const nfwd = forward(ns);
-                target += gamma * Math.max(...nfwd.out);
-            }
-            const error = target - fwd.out[a];
+            if (!done) { const nf = forward(ns); target += gamma * Math.max(...nf.out); }
+            const err = target - fwd.out[a];
 
-            // Backprop through output layer for action a
-            const dW2 = [], db2 = zeros(OUTPUT);
-            for (let i = 0; i < HIDDEN; i++) dW2[i] = zeros(OUTPUT);
-            db2[a] = error;
-            for (let i = 0; i < HIDDEN; i++) dW2[i][a] = error * fwd.h[i];
-
-            // Backprop through hidden
+            // Compute hidden gradients BEFORE modifying W2
             const dh = zeros(HIDDEN);
-            for (let i = 0; i < HIDDEN; i++) dh[i] = error * W2[i][a] * (fwd.h[i] > 0 ? 1 : 0);
+            for (let i = 0; i < HIDDEN; i++) {
+                dh[i] = err * W2[i][a] * (fwd.h[i] > 0 ? 1 : 0);
+            }
 
-            const inp = fwd.inp;
+            // Now update W2 and b2
+            for (let i = 0; i < HIDDEN; i++) {
+                W2[i][a] += lr * err * fwd.h[i];
+            }
+            b2[a] += lr * err;
+
+            // Update W1 and b1
             for (let i = 0; i < INPUT; i++) {
-                for (let j = 0; j < HIDDEN; j++) {
-                    W1[i][j] += lr * dh[j] * inp[i];
-                }
+                for (let j = 0; j < HIDDEN; j++) W1[i][j] += lr * dh[j] * fwd.inp[i];
             }
             for (let j = 0; j < HIDDEN; j++) b1[j] += lr * dh[j];
-            for (let i = 0; i < HIDDEN; i++) {
-                for (let j = 0; j < OUTPUT; j++) {
-                    W2[i][j] += lr * dW2[i][j];
-                }
-            }
-            for (let j = 0; j < OUTPUT; j++) b2[j] += lr * db2[j];
         }
     }
 
-    function runEpisode() {
-        let r = START.r, c = START.c;
-        const eps = Math.max(0.05, 0.5 - totalEpisodes * 0.005);
+    // ---- Pong simulation ----
+    function newBall() {
+        const angle = (Math.random() - 0.5) * Math.PI * 0.5;
+        return { x: GW * 0.2, y: Math.random() * GH * 0.6 + GH * 0.2, vx: BALL_SPEED, vy: BALL_SPEED * Math.sin(angle) };
+    }
 
-        for (let step = 0; step < 200; step++) {
-            const a = chooseAction([r, c], eps);
-            let nr = r + DR[a], nc = c + DC[a];
-            if (nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS || grid[nr][nc] === 1) { nr = r; nc = c; }
+    function simRally(eps) {
+        let ball = newBall();
+        let paddleY = GH / 2 - PADDLE_H / 2;
+        let hit = false;
 
-            let reward = -0.1;
+        for (let step = 0; step < 300; step++) {
+            const paddleCenter = paddleY + PADDLE_H / 2;
+            const state = [ball.x, ball.y, ball.vx, ball.vy, paddleCenter];
+            const action = chooseAction(state, eps);
+
+            // Move paddle
+            if (action === 0) paddleY = Math.max(0, paddleY - PADDLE_SPEED);
+            else if (action === 2) paddleY = Math.min(GH - PADDLE_H, paddleY + PADDLE_SPEED);
+
+            // Move ball
+            ball.x += ball.vx; ball.y += ball.vy;
+
+            // Top/bottom bounce
+            if (ball.y <= BALL_R) { ball.y = BALL_R; ball.vy = Math.abs(ball.vy); }
+            if (ball.y >= GH - BALL_R) { ball.y = GH - BALL_R; ball.vy = -Math.abs(ball.vy); }
+
+            // Left wall bounce
+            if (ball.x <= BALL_R) { ball.x = BALL_R; ball.vx = Math.abs(ball.vx); }
+
+            // Reward shaping: small reward for being close to the ball vertically
+            const newPaddleCenter = paddleY + PADDLE_H / 2;
+            const distBefore = Math.abs(ball.y - (state[4]));
+            const distAfter = Math.abs(ball.y - newPaddleCenter);
+            let reward = (distBefore - distAfter) * 0.01; // small shaping reward
             let done = false;
-            if (grid[nr][nc] === 2) { reward = 10; done = true; }
-            if (nr === r && nc === c) reward = -0.5;
 
-            replayBuffer.push([[r, c], a, reward, [nr, nc], done]);
+            // Paddle collision (right side)
+            const paddleX = GW - PADDLE_W - 5;
+            if (ball.x >= paddleX - BALL_R && ball.vx > 0) {
+                if (ball.y >= paddleY && ball.y <= paddleY + PADDLE_H) {
+                    ball.vx = -Math.abs(ball.vx);
+                    ball.x = paddleX - BALL_R;
+                    // Angle variation, but clamp vy
+                    const hitPos = (ball.y - paddleY) / PADDLE_H;
+                    ball.vy = BALL_SPEED * (hitPos - 0.5) * 2;
+                    ball.vy = Math.max(-BALL_SPEED, Math.min(BALL_SPEED, ball.vy));
+                    reward = 5;
+                    hit = true;
+                } else if (ball.x >= GW - BALL_R) {
+                    reward = -5; done = true; // Missed!
+                }
+            }
+
+            const nextState = [ball.x, ball.y, ball.vx, ball.vy, newPaddleCenter];
+            replayBuffer.push([state, action, reward, nextState, done]);
             if (replayBuffer.length > BUFFER_MAX) replayBuffer.shift();
 
-            trainOnBatch();
-
-            r = nr; c = nc;
+            if (step % 2 === 0) trainBatch();
             if (done) break;
         }
-        totalEpisodes++;
+
+        totalRallies++;
+        if (hit) totalHits++;
     }
 
     // ---- Drawing ----
-    function drawNetwork() {
-        const netX = 20, netY = 30;
-        const layerX = [60, 160, 260];
-        const layerSizes = [INPUT, HIDDEN, OUTPUT];
-        const layerLabels = ['STATE', 'HIDDEN', 'Q-VALUES'];
+    const ACTION_LABELS = ['UP', '—', 'DOWN'];
+    const INPUT_LABELS = ['bX', 'bY', 'vX', 'vY', 'pY'];
 
-        // Compute node positions
+    function drawNetwork() {
+        const layerX = [50, 150, 240];
+        const layerSizes = [INPUT, HIDDEN, OUTPUT];
+
         const nodes = [];
         for (let l = 0; l < 3; l++) {
             nodes[l] = [];
             const count = layerSizes[l];
-            const spacing = Math.min(35, (H - 80) / (count + 1));
-            const startY = netY + (H - 80) / 2 - (count - 1) * spacing / 2;
-            for (let n = 0; n < count; n++) {
-                nodes[l][n] = { x: layerX[l], y: startY + n * spacing };
-            }
+            const spacing = Math.min(28, (H - 80) / (count + 1));
+            const startY = H / 2 - (count - 1) * spacing / 2;
+            for (let n = 0; n < count; n++) nodes[l][n] = { x: layerX[l], y: startY + n * spacing };
         }
 
-        // Draw connections W1
+        // W1 connections
         for (let i = 0; i < INPUT; i++) {
             for (let j = 0; j < HIDDEN; j++) {
-                const w = W1[i][j];
-                const absW = Math.min(Math.abs(w), 3);
-                ctx.strokeStyle = w > 0 ? `rgba(0,229,255,${absW / 3})` : `rgba(255,0,85,${absW / 3})`;
-                ctx.lineWidth = absW * 1.5;
-                ctx.beginPath();
-                ctx.moveTo(nodes[0][i].x + 6, nodes[0][i].y);
-                ctx.lineTo(nodes[1][j].x - 6, nodes[1][j].y);
-                ctx.stroke();
+                const w = W1[i][j], absW = Math.min(Math.abs(w), 2);
+                ctx.strokeStyle = w > 0 ? `rgba(0,229,255,${absW / 2})` : `rgba(255,0,85,${absW / 2})`;
+                ctx.lineWidth = absW * 1.2;
+                ctx.beginPath(); ctx.moveTo(nodes[0][i].x + 6, nodes[0][i].y); ctx.lineTo(nodes[1][j].x - 6, nodes[1][j].y); ctx.stroke();
             }
         }
-
-        // Draw connections W2
+        // W2 connections
         for (let i = 0; i < HIDDEN; i++) {
             for (let j = 0; j < OUTPUT; j++) {
-                const w = W2[i][j];
-                const absW = Math.min(Math.abs(w), 3);
-                ctx.strokeStyle = w > 0 ? `rgba(0,229,255,${absW / 3})` : `rgba(255,0,85,${absW / 3})`;
-                ctx.lineWidth = absW * 1.5;
-                ctx.beginPath();
-                ctx.moveTo(nodes[1][i].x + 6, nodes[1][i].y);
-                ctx.lineTo(nodes[2][j].x - 6, nodes[2][j].y);
-                ctx.stroke();
+                const w = W2[i][j], absW = Math.min(Math.abs(w), 2);
+                ctx.strokeStyle = w > 0 ? `rgba(0,229,255,${absW / 2})` : `rgba(255,0,85,${absW / 2})`;
+                ctx.lineWidth = absW * 1.2;
+                ctx.beginPath(); ctx.moveTo(nodes[1][i].x + 6, nodes[1][i].y); ctx.lineTo(nodes[2][j].x - 6, nodes[2][j].y); ctx.stroke();
             }
         }
-
-        // Draw nodes
+        // Nodes
         for (let l = 0; l < 3; l++) {
             for (let n = 0; n < layerSizes[l]; n++) {
                 const nd = nodes[l][n];
-                ctx.beginPath();
-                ctx.arc(nd.x, nd.y, 6, 0, Math.PI * 2);
-                ctx.fillStyle = l === 0 ? '#ff0055' : l === 1 ? '#888' : '#00e5ff';
-                ctx.fill();
-                ctx.strokeStyle = '#fff';
-                ctx.lineWidth = 1;
-                ctx.stroke();
+                ctx.beginPath(); ctx.arc(nd.x, nd.y, 5, 0, Math.PI * 2);
+                ctx.fillStyle = l === 0 ? '#ff0055' : l === 1 ? '#555' : '#00e5ff';
+                ctx.fill(); ctx.strokeStyle = '#888'; ctx.lineWidth = 1; ctx.stroke();
             }
         }
-
+        // Input labels
+        ctx.font = '9px Courier New'; ctx.textAlign = 'right'; ctx.fillStyle = '#888';
+        for (let i = 0; i < INPUT; i++) ctx.fillText(INPUT_LABELS[i], nodes[0][i].x - 10, nodes[0][i].y + 3);
         // Output labels
-        for (let j = 0; j < OUTPUT; j++) {
-            ctx.fillStyle = '#888';
-            ctx.font = '10px Courier New';
-            ctx.textAlign = 'left';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(ACTION_SYMS[j], nodes[2][j].x + 12, nodes[2][j].y);
-        }
+        ctx.textAlign = 'left'; ctx.fillStyle = '#888';
+        for (let j = 0; j < OUTPUT; j++) ctx.fillText(ACTION_LABELS[j], nodes[2][j].x + 10, nodes[2][j].y + 3);
 
         // Layer labels
-        ctx.fillStyle = '#555';
-        ctx.font = '9px Courier New';
-        ctx.textAlign = 'center';
-        for (let l = 0; l < 3; l++) {
-            ctx.fillText(layerLabels[l], layerX[l], netY + 5);
-        }
+        ctx.font = '8px Courier New'; ctx.textAlign = 'center'; ctx.fillStyle = '#555';
+        ctx.fillText('STATE', layerX[0], 18); ctx.fillText('HIDDEN', layerX[1], 18); ctx.fillText('Q-VALUES', layerX[2], 18);
 
-        // Episode counter
-        ctx.fillStyle = '#888';
-        ctx.font = '11px Courier New';
-        ctx.textAlign = 'left';
-        ctx.fillText(`DQN EPISODES: ${totalEpisodes}`, 20, H - 10);
+        // Stats
+        ctx.font = '10px Courier New'; ctx.textAlign = 'left'; ctx.fillStyle = '#888';
+        ctx.fillText(`Rallies: ${totalRallies}`, 10, H - 25);
+        const hitRate = totalRallies > 0 ? Math.floor(totalHits / totalRallies * 100) : 0;
+        ctx.fillText(`Hit rate: ${hitRate}%`, 10, H - 10);
     }
 
-    function drawPolicyGrid() {
-        ctx.fillStyle = '#555';
-        ctx.font = '10px Courier New';
-        ctx.textAlign = 'center';
-        ctx.fillText('LEARNED POLICY', gridOffX + COLS * GCELL / 2, gridOffY - 8);
+    function drawPong(ball, paddleY, label) {
+        // Game area background
+        ctx.fillStyle = '#0a0a0a';
+        ctx.fillRect(GAME_X, GAME_Y, GW, GH);
+        ctx.strokeStyle = '#333'; ctx.lineWidth = 1;
+        ctx.strokeRect(GAME_X, GAME_Y, GW, GH);
 
-        for (let r = 0; r < ROWS; r++) {
-            for (let c = 0; c < COLS; c++) {
-                const x = gridOffX + c * GCELL;
-                const y = gridOffY + r * GCELL;
+        // Center line
+        ctx.setLineDash([4, 4]); ctx.strokeStyle = '#222'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(GAME_X + GW / 2, GAME_Y); ctx.lineTo(GAME_X + GW / 2, GAME_Y + GH); ctx.stroke();
+        ctx.setLineDash([]);
 
-                if (grid[r][c] === 1) {
-                    ctx.fillStyle = '#1a1a1a';
-                } else if (grid[r][c] === 2) {
-                    ctx.fillStyle = '#004d00';
-                } else {
-                    const { out } = forward([r, c]);
-                    const maxQ = Math.max(...out);
-                    const intensity = Math.min(1, Math.max(0, maxQ / 10));
-                    ctx.fillStyle = `rgba(0, 229, 255, ${intensity * 0.25})`;
-                }
-                ctx.fillRect(x, y, GCELL, GCELL);
-                ctx.strokeStyle = '#333';
-                ctx.lineWidth = 1;
-                ctx.strokeRect(x, y, GCELL, GCELL);
+        // Paddle
+        const px = GAME_X + GW - PADDLE_W - 5;
+        ctx.fillStyle = '#00e5ff';
+        ctx.shadowBlur = 8; ctx.shadowColor = '#00e5ff';
+        ctx.fillRect(px, GAME_Y + paddleY, PADDLE_W, PADDLE_H);
+        ctx.shadowBlur = 0;
 
-                // Draw best action arrow
-                if (grid[r][c] === 0 && totalEpisodes > 0) {
-                    const { out } = forward([r, c]);
-                    const bestA = out.indexOf(Math.max(...out));
-                    const maxQ = Math.max(...out);
-                    if (maxQ > 0.01) {
-                        ctx.fillStyle = `rgba(0, 229, 255, ${Math.min(1, maxQ / 5)})`;
-                        ctx.font = `${Math.floor(GCELL * 0.5)}px sans-serif`;
-                        ctx.textAlign = 'center';
-                        ctx.textBaseline = 'middle';
-                        ctx.fillText(ACTION_SYMS[bestA], x + GCELL / 2, y + GCELL / 2);
-                    }
-                }
-
-                if (grid[r][c] === 2) {
-                    ctx.fillStyle = '#00ff88';
-                    ctx.font = `bold ${Math.floor(GCELL * 0.45)}px Courier New`;
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'middle';
-                    ctx.fillText('★', x + GCELL / 2, y + GCELL / 2);
-                }
-            }
+        // Ball
+        if (ball) {
+            ctx.beginPath();
+            ctx.arc(GAME_X + ball.x, GAME_Y + ball.y, BALL_R, 0, Math.PI * 2);
+            ctx.fillStyle = '#fff';
+            ctx.shadowBlur = 6; ctx.shadowColor = '#fff';
+            ctx.fill();
+            ctx.shadowBlur = 0;
         }
 
-        // Start label
-        const sx = gridOffX + START.c * GCELL + GCELL / 2;
-        const sy = gridOffY + START.r * GCELL + GCELL - 2;
-        ctx.fillStyle = '#ff0055';
-        ctx.font = '7px Courier New';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'bottom';
-        ctx.fillText('START', sx, sy);
+        // Label
+        if (label) {
+            ctx.font = '11px Courier New'; ctx.textAlign = 'center'; ctx.fillStyle = '#666';
+            ctx.fillText(label, GAME_X + GW / 2, GAME_Y + GH + 12);
+        }
     }
 
     function draw() {
         ctx.clearRect(0, 0, W, H);
         drawNetwork();
-        drawPolicyGrid();
+        drawPong(null, GH / 2 - PADDLE_H / 2, totalRallies === 0 ? 'PRESS TRAIN TO BEGIN' : `TRAINED ${totalRallies} RALLIES`);
     }
 
+    // ---- Train ----
     trainBtn.addEventListener('click', () => {
-        trainBtn.disabled = true;
+        trainBtn.disabled = true; showBtn.disabled = true;
         trainBtn.innerText = 'TRAINING...';
         let i = 0;
         function step() {
-            if (i >= 50) {
-                trainBtn.disabled = false;
-                trainBtn.innerText = 'TRAIN DQN (50 EPISODES)';
+            if (i >= 1000) {
+                trainBtn.disabled = false; showBtn.disabled = false;
+                trainBtn.innerText = 'TRAIN DQN (1000 RALLIES)';
                 draw();
                 return;
             }
-            runEpisode();
-            if (i % 5 === 0) draw();
+            const eps = Math.max(0.05, 0.5 - totalRallies * 0.002);
+            simRally(eps);
+            if (i % 25 === 0) {
+                ctx.clearRect(0, 0, W, H);
+                drawNetwork();
+                drawPong(null, GH / 2 - PADDLE_H / 2, `TRAINING... ${i}/1000`);
+            }
             i++;
-            setTimeout(step, 10);
+            setTimeout(step, 0);
         }
         step();
     });
 
-    showBtn.addEventListener('click', () => { draw(); });
-    resetBtn.addEventListener('click', () => { initNetwork(); draw(); });
+    // ---- Watch AI Play ----
+    let watchAnimId = null;
+
+    showBtn.addEventListener('click', () => {
+        if (watchAnimId) { cancelAnimationFrame(watchAnimId); watchAnimId = null; }
+        trainBtn.disabled = true; showBtn.innerText = 'PLAYING...';
+
+        let ball = newBall();
+        let paddleY = GH / 2 - PADDLE_H / 2;
+        let rallyHits = 0;
+
+        function gameFrame() {
+            const state = [ball.x, ball.y, ball.vx, ball.vy, paddleY + PADDLE_H / 2];
+            const action = bestAction(state);
+
+            if (action === 0) paddleY = Math.max(0, paddleY - PADDLE_SPEED);
+            else if (action === 2) paddleY = Math.min(GH - PADDLE_H, paddleY + PADDLE_SPEED);
+
+            ball.x += ball.vx; ball.y += ball.vy;
+            if (ball.y <= BALL_R) { ball.y = BALL_R; ball.vy = Math.abs(ball.vy); }
+            if (ball.y >= GH - BALL_R) { ball.y = GH - BALL_R; ball.vy = -Math.abs(ball.vy); }
+            if (ball.x <= BALL_R) { ball.x = BALL_R; ball.vx = Math.abs(ball.vx); }
+
+            const paddleX = GW - PADDLE_W - 5;
+            let done = false;
+            if (ball.x >= paddleX - BALL_R && ball.vx > 0) {
+                if (ball.y >= paddleY && ball.y <= paddleY + PADDLE_H) {
+                    ball.vx = -Math.abs(ball.vx); ball.x = paddleX - BALL_R;
+                    const hitPos = (ball.y - paddleY) / PADDLE_H;
+                    ball.vy += (hitPos - 0.5) * 2;
+                    rallyHits++;
+                } else if (ball.x >= GW - BALL_R) {
+                    done = true;
+                }
+            }
+
+            ctx.clearRect(0, 0, W, H);
+            drawNetwork();
+            drawPong(ball, paddleY, `HITS: ${rallyHits}`);
+
+            if (done) {
+                // Show miss briefly, then restart
+                ctx.fillStyle = '#ff0055'; ctx.font = 'bold 14px Courier New'; ctx.textAlign = 'center';
+                ctx.fillText('MISS!', GAME_X + GW / 2, GAME_Y + GH / 2);
+                setTimeout(() => {
+                    ball = newBall();
+                    paddleY = GH / 2 - PADDLE_H / 2;
+                    rallyHits = 0;
+                    watchAnimId = requestAnimationFrame(gameFrame);
+                }, 800);
+            } else {
+                watchAnimId = requestAnimationFrame(gameFrame);
+            }
+        }
+        watchAnimId = requestAnimationFrame(gameFrame);
+    });
+
+    resetBtn.addEventListener('click', () => {
+        if (watchAnimId) { cancelAnimationFrame(watchAnimId); watchAnimId = null; }
+        initNetwork();
+        trainBtn.disabled = false; showBtn.disabled = false;
+        trainBtn.innerText = 'TRAIN DQN (500 RALLIES)';
+        showBtn.innerText = 'WATCH AI PLAY';
+        draw();
+    });
 
     draw();
 })();

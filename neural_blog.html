@@ -493,18 +493,18 @@
         the network that provides stable Q-value targets, updated periodically, preventing the network from chasing
         a moving goal.</p>
 
-    <div class="interactive-container" style="min-height: 500px; padding-bottom: 2rem;">
-        <canvas id="dqnCanvas" width="600" height="360"></canvas>
+    <div class="interactive-container" style="min-height: 520px; padding-bottom: 2rem;">
+        <canvas id="dqnCanvas" width="600" height="350"></canvas>
         <div class="controls">
-            <button id="dqn-train-btn">TRAIN DQN (50 EPISODES)</button>
-            <button id="dqn-show-btn" style="background:#222; color:#00e5ff; border: 1px solid #00e5ff;">SHOW LEARNED
-                POLICY</button>
+            <button id="dqn-train-btn">TRAIN DQN (1000 RALLIES)</button>
+            <button id="dqn-show-btn" style="background:#222; color:#00e5ff; border: 1px solid #00e5ff;">WATCH AI
+                PLAY</button>
             <button id="dqn-reset-btn" style="background:#333; color:#fff;">RESET</button>
         </div>
         <p
             style="font-size: 0.9rem; color: #888; text-align: center; margin-top: 1rem; font-family: 'Courier New', monospace;">
-            Watch a tiny neural network learn to approximate Q-values. The left panel shows the network architecture
-            and weight changes. The right panel shows the learned policy on the grid.
+            The neural network on the left takes 5 inputs — ball position, velocity, and paddle position — and
+            outputs Q-values for UP, STAY, and DOWN. Train the DQN, then watch as the AI learns to play Pong.
         </p>
     </div>
 
