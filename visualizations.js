@@ -1340,7 +1340,353 @@
 })();
 
 // ==========================================
-// 13. DREAMING MACHINES (REVERSE DIFFUSION)
+// 13. DEEP Q-NETWORK VISUALIZATION
+// ==========================================
+(function () {
+    const canvas = document.getElementById('dqnCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const trainBtn = document.getElementById('dqn-train-btn');
+    const showBtn = document.getElementById('dqn-show-btn');
+    const resetBtn = document.getElementById('dqn-reset-btn');
+
+    const W = canvas.width, H = canvas.height;
+
+    // Grid setup (same layout as RL section)
+    const ROWS = 6, COLS = 8;
+    const GCELL = 28;
+    const gridOffX = W - COLS * GCELL - 20;
+    const gridOffY = 40;
+
+    const DR = [-1, 0, 1, 0], DC = [0, 1, 0, -1];
+    const ACTION_SYMS = ['↑', '→', '↓', '←'];
+
+    const grid = [];
+    const GOAL = { r: 1, c: COLS - 2 };
+    const START = { r: ROWS - 2, c: 1 };
+
+    function initGrid() {
+        for (let r = 0; r < ROWS; r++) {
+            grid[r] = [];
+            for (let c = 0; c < COLS; c++) grid[r][c] = 0;
+        }
+        const walls = [
+            [1, 3], [2, 3], [3, 3], [3, 5], [2, 5], [1, 5],
+            [0, 0], [0, 1], [0, 2], [0, 3], [0, 4], [0, 5], [0, 6], [0, 7],
+            [5, 0], [5, 1], [5, 2], [5, 3], [5, 4], [5, 5], [5, 6], [5, 7],
+            [1, 0], [2, 0], [3, 0], [4, 0], [1, 7], [2, 7], [3, 7], [4, 7]
+        ];
+        walls.forEach(([r, c]) => { grid[r][c] = 1; });
+        grid[GOAL.r][GOAL.c] = 2;
+    }
+    initGrid();
+
+    // Tiny neural network: 2 inputs (r,c normalized) -> 8 hidden -> 4 outputs (Q per action)
+    const INPUT = 2, HIDDEN = 8, OUTPUT = 4;
+    let W1, b1, W2, b2;
+    let totalEpisodes = 0;
+    let replayBuffer = [];
+    const BUFFER_MAX = 500;
+    const BATCH = 32;
+    const lr = 0.01, gamma = 0.9;
+
+    function randW(fan_in, fan_out) {
+        const w = [];
+        const scale = Math.sqrt(2.0 / fan_in);
+        for (let i = 0; i < fan_in; i++) {
+            w[i] = [];
+            for (let j = 0; j < fan_out; j++) w[i][j] = (Math.random() - 0.5) * scale;
+        }
+        return w;
+    }
+    function zeros(n) { return new Array(n).fill(0); }
+
+    function initNetwork() {
+        W1 = randW(INPUT, HIDDEN);
+        b1 = zeros(HIDDEN);
+        W2 = randW(HIDDEN, OUTPUT);
+        b2 = zeros(OUTPUT);
+        totalEpisodes = 0;
+        replayBuffer = [];
+    }
+    initNetwork();
+
+    function relu(x) { return Math.max(0, x); }
+
+    function forward(state) {
+        const [r, c] = state;
+        const inp = [r / ROWS, c / COLS];
+        // Hidden layer
+        const h = [];
+        for (let j = 0; j < HIDDEN; j++) {
+            let sum = b1[j];
+            for (let i = 0; i < INPUT; i++) sum += inp[i] * W1[i][j];
+            h[j] = relu(sum);
+        }
+        // Output layer
+        const out = [];
+        for (let j = 0; j < OUTPUT; j++) {
+            let sum = b2[j];
+            for (let i = 0; i < HIDDEN; i++) sum += h[i] * W2[i][j];
+            out[j] = sum;
+        }
+        return { inp, h, out };
+    }
+
+    function chooseAction(state, eps) {
+        if (Math.random() < eps) return Math.floor(Math.random() * 4);
+        const { out } = forward(state);
+        let best = 0;
+        for (let a = 1; a < 4; a++) { if (out[a] > out[best]) best = a; }
+        return best;
+    }
+
+    function trainOnBatch() {
+        if (replayBuffer.length < BATCH) return;
+        // Sample random batch
+        const batch = [];
+        for (let i = 0; i < BATCH; i++) {
+            batch.push(replayBuffer[Math.floor(Math.random() * replayBuffer.length)]);
+        }
+
+        for (const [s, a, r, ns, done] of batch) {
+            const fwd = forward(s);
+            let target = r;
+            if (!done) {
+                const nfwd = forward(ns);
+                target += gamma * Math.max(...nfwd.out);
+            }
+            const error = target - fwd.out[a];
+
+            // Backprop through output layer for action a
+            const dW2 = [], db2 = zeros(OUTPUT);
+            for (let i = 0; i < HIDDEN; i++) dW2[i] = zeros(OUTPUT);
+            db2[a] = error;
+            for (let i = 0; i < HIDDEN; i++) dW2[i][a] = error * fwd.h[i];
+
+            // Backprop through hidden
+            const dh = zeros(HIDDEN);
+            for (let i = 0; i < HIDDEN; i++) dh[i] = error * W2[i][a] * (fwd.h[i] > 0 ? 1 : 0);
+
+            const inp = fwd.inp;
+            for (let i = 0; i < INPUT; i++) {
+                for (let j = 0; j < HIDDEN; j++) {
+                    W1[i][j] += lr * dh[j] * inp[i];
+                }
+            }
+            for (let j = 0; j < HIDDEN; j++) b1[j] += lr * dh[j];
+            for (let i = 0; i < HIDDEN; i++) {
+                for (let j = 0; j < OUTPUT; j++) {
+                    W2[i][j] += lr * dW2[i][j];
+                }
+            }
+            for (let j = 0; j < OUTPUT; j++) b2[j] += lr * db2[j];
+        }
+    }
+
+    function runEpisode() {
+        let r = START.r, c = START.c;
+        const eps = Math.max(0.05, 0.5 - totalEpisodes * 0.005);
+
+        for (let step = 0; step < 200; step++) {
+            const a = chooseAction([r, c], eps);
+            let nr = r + DR[a], nc = c + DC[a];
+            if (nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS || grid[nr][nc] === 1) { nr = r; nc = c; }
+
+            let reward = -0.1;
+            let done = false;
+            if (grid[nr][nc] === 2) { reward = 10; done = true; }
+            if (nr === r && nc === c) reward = -0.5;
+
+            replayBuffer.push([[r, c], a, reward, [nr, nc], done]);
+            if (replayBuffer.length > BUFFER_MAX) replayBuffer.shift();
+
+            trainOnBatch();
+
+            r = nr; c = nc;
+            if (done) break;
+        }
+        totalEpisodes++;
+    }
+
+    // ---- Drawing ----
+    function drawNetwork() {
+        const netX = 20, netY = 30;
+        const layerX = [60, 160, 260];
+        const layerSizes = [INPUT, HIDDEN, OUTPUT];
+        const layerLabels = ['STATE', 'HIDDEN', 'Q-VALUES'];
+
+        // Compute node positions
+        const nodes = [];
+        for (let l = 0; l < 3; l++) {
+            nodes[l] = [];
+            const count = layerSizes[l];
+            const spacing = Math.min(35, (H - 80) / (count + 1));
+            const startY = netY + (H - 80) / 2 - (count - 1) * spacing / 2;
+            for (let n = 0; n < count; n++) {
+                nodes[l][n] = { x: layerX[l], y: startY + n * spacing };
+            }
+        }
+
+        // Draw connections W1
+        for (let i = 0; i < INPUT; i++) {
+            for (let j = 0; j < HIDDEN; j++) {
+                const w = W1[i][j];
+                const absW = Math.min(Math.abs(w), 3);
+                ctx.strokeStyle = w > 0 ? `rgba(0,229,255,${absW / 3})` : `rgba(255,0,85,${absW / 3})`;
+                ctx.lineWidth = absW * 1.5;
+                ctx.beginPath();
+                ctx.moveTo(nodes[0][i].x + 6, nodes[0][i].y);
+                ctx.lineTo(nodes[1][j].x - 6, nodes[1][j].y);
+                ctx.stroke();
+            }
+        }
+
+        // Draw connections W2
+        for (let i = 0; i < HIDDEN; i++) {
+            for (let j = 0; j < OUTPUT; j++) {
+                const w = W2[i][j];
+                const absW = Math.min(Math.abs(w), 3);
+                ctx.strokeStyle = w > 0 ? `rgba(0,229,255,${absW / 3})` : `rgba(255,0,85,${absW / 3})`;
+                ctx.lineWidth = absW * 1.5;
+                ctx.beginPath();
+                ctx.moveTo(nodes[1][i].x + 6, nodes[1][i].y);
+                ctx.lineTo(nodes[2][j].x - 6, nodes[2][j].y);
+                ctx.stroke();
+            }
+        }
+
+        // Draw nodes
+        for (let l = 0; l < 3; l++) {
+            for (let n = 0; n < layerSizes[l]; n++) {
+                const nd = nodes[l][n];
+                ctx.beginPath();
+                ctx.arc(nd.x, nd.y, 6, 0, Math.PI * 2);
+                ctx.fillStyle = l === 0 ? '#ff0055' : l === 1 ? '#888' : '#00e5ff';
+                ctx.fill();
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            }
+        }
+
+        // Output labels
+        for (let j = 0; j < OUTPUT; j++) {
+            ctx.fillStyle = '#888';
+            ctx.font = '10px Courier New';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(ACTION_SYMS[j], nodes[2][j].x + 12, nodes[2][j].y);
+        }
+
+        // Layer labels
+        ctx.fillStyle = '#555';
+        ctx.font = '9px Courier New';
+        ctx.textAlign = 'center';
+        for (let l = 0; l < 3; l++) {
+            ctx.fillText(layerLabels[l], layerX[l], netY + 5);
+        }
+
+        // Episode counter
+        ctx.fillStyle = '#888';
+        ctx.font = '11px Courier New';
+        ctx.textAlign = 'left';
+        ctx.fillText(`DQN EPISODES: ${totalEpisodes}`, 20, H - 10);
+    }
+
+    function drawPolicyGrid() {
+        ctx.fillStyle = '#555';
+        ctx.font = '10px Courier New';
+        ctx.textAlign = 'center';
+        ctx.fillText('LEARNED POLICY', gridOffX + COLS * GCELL / 2, gridOffY - 8);
+
+        for (let r = 0; r < ROWS; r++) {
+            for (let c = 0; c < COLS; c++) {
+                const x = gridOffX + c * GCELL;
+                const y = gridOffY + r * GCELL;
+
+                if (grid[r][c] === 1) {
+                    ctx.fillStyle = '#1a1a1a';
+                } else if (grid[r][c] === 2) {
+                    ctx.fillStyle = '#004d00';
+                } else {
+                    const { out } = forward([r, c]);
+                    const maxQ = Math.max(...out);
+                    const intensity = Math.min(1, Math.max(0, maxQ / 10));
+                    ctx.fillStyle = `rgba(0, 229, 255, ${intensity * 0.25})`;
+                }
+                ctx.fillRect(x, y, GCELL, GCELL);
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(x, y, GCELL, GCELL);
+
+                // Draw best action arrow
+                if (grid[r][c] === 0 && totalEpisodes > 0) {
+                    const { out } = forward([r, c]);
+                    const bestA = out.indexOf(Math.max(...out));
+                    const maxQ = Math.max(...out);
+                    if (maxQ > 0.01) {
+                        ctx.fillStyle = `rgba(0, 229, 255, ${Math.min(1, maxQ / 5)})`;
+                        ctx.font = `${Math.floor(GCELL * 0.5)}px sans-serif`;
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText(ACTION_SYMS[bestA], x + GCELL / 2, y + GCELL / 2);
+                    }
+                }
+
+                if (grid[r][c] === 2) {
+                    ctx.fillStyle = '#00ff88';
+                    ctx.font = `bold ${Math.floor(GCELL * 0.45)}px Courier New`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('★', x + GCELL / 2, y + GCELL / 2);
+                }
+            }
+        }
+
+        // Start label
+        const sx = gridOffX + START.c * GCELL + GCELL / 2;
+        const sy = gridOffY + START.r * GCELL + GCELL - 2;
+        ctx.fillStyle = '#ff0055';
+        ctx.font = '7px Courier New';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText('START', sx, sy);
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, W, H);
+        drawNetwork();
+        drawPolicyGrid();
+    }
+
+    trainBtn.addEventListener('click', () => {
+        trainBtn.disabled = true;
+        trainBtn.innerText = 'TRAINING...';
+        let i = 0;
+        function step() {
+            if (i >= 50) {
+                trainBtn.disabled = false;
+                trainBtn.innerText = 'TRAIN DQN (50 EPISODES)';
+                draw();
+                return;
+            }
+            runEpisode();
+            if (i % 5 === 0) draw();
+            i++;
+            setTimeout(step, 10);
+        }
+        step();
+    });
+
+    showBtn.addEventListener('click', () => { draw(); });
+    resetBtn.addEventListener('click', () => { initNetwork(); draw(); });
+
+    draw();
+})();
+
+// ==========================================
+// 14. DREAMING MACHINES (REVERSE DIFFUSION)
 // ==========================================
 (function () {
     const canvas = document.getElementById('diffusionCanvas');
@@ -1498,13 +1844,7 @@
         mapCtx.lineWidth = 2;
         mapCtx.stroke();
 
-        // Corner labels
-        mapCtx.font = '14px serif';
-        mapCtx.fillStyle = 'rgba(255,255,255,0.5)';
-        mapCtx.fillText('🔴', 4, 16);        // Top-left: Red Circle
-        mapCtx.fillText('🟡', 180, 16);       // Top-right: Yellow
-        mapCtx.fillText('🔵', 4, 196);        // Bottom-left: Blue
-        mapCtx.fillText('🟢', 180, 196);      // Bottom-right: Green
+
     }
 
     // Function to draw a rounded polygon / superellipse shape

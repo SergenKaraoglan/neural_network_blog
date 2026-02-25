@@ -53,6 +53,7 @@
             <li><a href="#sec-overfit">The Memorization Problem</a></li>
             <li><a href="#sec-ssl">Teaching Without a Teacher</a></li>
             <li><a href="#sec-rl">Learning by Doing (Reinforcement Learning)</a></li>
+            <li><a href="#sec-dqn">The Neural Strategist (Deep Q-Learning)</a></li>
             <li><a href="#sec-genai">Dreaming Machines (GenAI)</a></li>
             <li><a href="#sec-latent">The Space Between (Manifolds)</a></li>
             <li><a href="#sec-illusion">The Illusion of Intelligence</a></li>
@@ -473,8 +474,50 @@
         combined with deep neural networks (Deep RL), the Q-Table is replaced by a neural network that can generalize
         across millions of possible states—turning brute-force memorization into genuine strategic reasoning.</p>
 
+    <span class="section-tag tag-advanced">ADVANCED</span>
+    <h2 id="sec-dqn">13. The Neural Strategist (Deep Q-Learning)</h2>
+    <p>Our Q-Table from the previous section works beautifully for a small grid. But what happens when the
+        state space explodes? A game of Atari has billions of possible screen configurations. A Go board has more
+        legal positions than atoms in the universe. No table could ever hold all of those entries.</p>
+
+    <p>The breakthrough idea behind <strong>Deep Q-Networks (DQN)</strong> is to replace the Q-Table with a
+        <strong>neural network</strong>. Instead of looking up "state → value" from a memorized list, the network
+        <em>generalizes</em>: it learns patterns across states so it can estimate the value of states it has
+        never seen before. The input is the raw state (pixels, board positions, sensor readings), and the output
+        is a predicted Q-value for each possible action.
+    </p>
+
+    <p>Training a DQN uses two key innovations. First, <strong>Experience Replay</strong>: instead of learning
+        from experiences in order, the agent stores transitions in a memory buffer and samples random mini-batches,
+        breaking correlations and stabilizing learning. Second, a <strong>Target Network</strong>: a frozen copy of
+        the network that provides stable Q-value targets, updated periodically, preventing the network from chasing
+        a moving goal.</p>
+
+    <div class="interactive-container" style="min-height: 500px; padding-bottom: 2rem;">
+        <canvas id="dqnCanvas" width="600" height="360"></canvas>
+        <div class="controls">
+            <button id="dqn-train-btn">TRAIN DQN (50 EPISODES)</button>
+            <button id="dqn-show-btn" style="background:#222; color:#00e5ff; border: 1px solid #00e5ff;">SHOW LEARNED
+                POLICY</button>
+            <button id="dqn-reset-btn" style="background:#333; color:#fff;">RESET</button>
+        </div>
+        <p
+            style="font-size: 0.9rem; color: #888; text-align: center; margin-top: 1rem; font-family: 'Courier New', monospace;">
+            Watch a tiny neural network learn to approximate Q-values. The left panel shows the network architecture
+            and weight changes. The right panel shows the learned policy on the grid.
+        </p>
+    </div>
+
+    <p>This is the technique that allowed DeepMind's agent to master 49 different Atari games from raw pixels
+        alone—using the same architecture and hyperparameters for each game. The neural network doesn't just
+        memorize; it learns to <em>see</em> the game, recognizing patterns like "the ball is heading toward me"
+        or "there's a gap in the wall." Combined with modern extensions like <strong>Double DQN</strong>,
+        <strong>Dueling Networks</strong>, and <strong>Prioritized Replay</strong>, Deep RL has become one of
+        the most powerful frameworks in all of AI.
+    </p>
+
     <span class="section-tag tag-generative">GENERATIVE</span>
-    <h2 id="sec-genai">13. Dreaming Machines (Generative AI)</h2>
+    <h2 id="sec-genai">14. Dreaming Machines (Generative AI)</h2>
     <p>Everything up to this point has been discriminative AI: looking at data and assigning it a boundary or a
         probability. But what happens when we ask the network to generate brand new data? This is Generative AI.</p>
 
@@ -508,7 +551,7 @@
     </div>
 
     <span class="section-tag tag-generative">GENERATIVE</span>
-    <h2 id="sec-latent">14. The Space Between (Manifolds &amp; Latent Spaces)</h2>
+    <h2 id="sec-latent">15. The Space Between (Manifolds &amp; Latent Spaces)</h2>
     <p>We've talked about how neural networks fold space and generate data, but <em>where</em> does that data come from?
         When a model like Midjourney turns text into an image, it isn't pulling from a database; it's navigating a
         <strong>Latent Space</strong>.
@@ -550,7 +593,7 @@
     </p>
 
     <span class="section-tag">PHILOSOPHY</span>
-    <h2 id="sec-illusion">15. The Illusion of Intelligence</h2>
+    <h2 id="sec-illusion">16. The Illusion of Intelligence</h2>
     <p>What is a Neural Network, truly? We have seen that it is not a brain. It does not "think." It is purely a
         parametric mathematical function. It is nothing more than a series of matrix multiplications interspersed with
         simple, non-linear hinges.</p>
