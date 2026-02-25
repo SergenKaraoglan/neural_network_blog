@@ -54,6 +54,7 @@
             <li><a href="#sec-ssl">Teaching Without a Teacher</a></li>
             <li><a href="#sec-rl">Learning by Doing (Reinforcement Learning)</a></li>
             <li><a href="#sec-dqn">The Neural Strategist (Deep Q-Learning)</a></li>
+            <li><a href="#sec-mcts">Mastering Games (AlphaZero & MCTS)</a></li>
             <li><a href="#sec-genai">Dreaming Machines (GenAI)</a></li>
             <li><a href="#sec-latent">The Space Between (Manifolds)</a></li>
             <li><a href="#sec-illusion">The Illusion of Intelligence</a></li>
@@ -516,8 +517,46 @@
         the most powerful frameworks in all of AI.
     </p>
 
+    <span class="section-tag tag-advanced">ADVANCED</span>
+    <h2 id="sec-mcts">14. Mastering Games (AlphaZero & MCTS)</h2>
+    <p>Deep Q-Networks learn to play games by trial and error, but there's a fundamentally different approach:
+        <strong>planning ahead</strong>. When a chess grandmaster considers a move, they don't just react to the
+        current board—they simulate future sequences of play, evaluating which paths lead to victory. This is
+        the idea behind <strong>Monte Carlo Tree Search (MCTS)</strong>.
+    </p>
+
+    <p>MCTS works in four repeated steps. <strong>Select</strong>: starting from the current game state, follow
+        the most promising branch of the search tree. <strong>Expand</strong>: when you reach an unexplored
+        position, add it to the tree. <strong>Evaluate</strong>: estimate how good this position is (using
+        random playouts or a neural network). <strong>Backup</strong>: propagate the result back up the tree,
+        updating every node along the path.</p>
+
+    <p><strong>AlphaZero</strong> supercharged this process by replacing random playouts with a neural network
+        that outputs both a <em>policy</em> ("which moves look promising?") and a <em>value</em> ("who's
+        winning from here?"). The network guides the search toward strong moves, while the search generates
+        training data to improve the network—a beautiful self-reinforcing loop.</p>
+
+    <div class="interactive-container" style="min-height: 520px; padding-bottom: 2rem;">
+        <canvas id="mctsCanvas" width="620" height="400"></canvas>
+        <div class="controls">
+            <button id="mcts-reset-btn">NEW GAME</button>
+            <button id="mcts-hint-btn" style="background:#222; color:#00e5ff; border: 1px solid #00e5ff;">SHOW AI
+                THINKING</button>
+        </div>
+        <p
+            style="font-size: 0.9rem; color: #888; text-align: center; margin-top: 1rem; font-family: 'Courier New', monospace;">
+            Play Tic-Tac-Toe against an MCTS agent. Click a cell to place X. The tree on the right shows
+            the AI's search process — thicker branches = more visits, color shows win probability.
+        </p>
+    </div>
+
+    <p>The result was stunning: AlphaZero taught itself Chess, Go, and Shogi from scratch—knowing nothing
+        but the rules—and defeated world-champion programs in each game within hours. It discovered opening
+        strategies, sacrificial play, and deep positional ideas that humans had spent centuries developing.
+        All from pure self-play, guided by search and a neural network working in concert.</p>
+
     <span class="section-tag tag-generative">GENERATIVE</span>
-    <h2 id="sec-genai">14. Dreaming Machines (Generative AI)</h2>
+    <h2 id="sec-genai">15. Dreaming Machines (Generative AI)</h2>
     <p>Everything up to this point has been discriminative AI: looking at data and assigning it a boundary or a
         probability. But what happens when we ask the network to generate brand new data? This is Generative AI.</p>
 
@@ -551,7 +590,7 @@
     </div>
 
     <span class="section-tag tag-generative">GENERATIVE</span>
-    <h2 id="sec-latent">15. The Space Between (Manifolds &amp; Latent Spaces)</h2>
+    <h2 id="sec-latent">16. The Space Between (Manifolds &amp; Latent Spaces)</h2>
     <p>We've talked about how neural networks fold space and generate data, but <em>where</em> does that data come from?
         When a model like Midjourney turns text into an image, it isn't pulling from a database; it's navigating a
         <strong>Latent Space</strong>.
@@ -593,7 +632,7 @@
     </p>
 
     <span class="section-tag">PHILOSOPHY</span>
-    <h2 id="sec-illusion">16. The Illusion of Intelligence</h2>
+    <h2 id="sec-illusion">17. The Illusion of Intelligence</h2>
     <p>What is a Neural Network, truly? We have seen that it is not a brain. It does not "think." It is purely a
         parametric mathematical function. It is nothing more than a series of matrix multiplications interspersed with
         simple, non-linear hinges.</p>

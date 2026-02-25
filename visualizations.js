@@ -1701,7 +1701,420 @@
 })();
 
 // ==========================================
-// 14. DREAMING MACHINES (REVERSE DIFFUSION)
+// ==========================================
+// 14. ALPHAZERO & MCTS — TIC-TAC-TOE
+// ==========================================
+(function () {
+    const canvas = document.getElementById('mctsCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const resetBtn = document.getElementById('mcts-reset-btn');
+    const hintBtn = document.getElementById('mcts-hint-btn');
+
+    const CW = canvas.width, CH = canvas.height;
+
+    // Board constants
+    const CELL = 50, BOARD_PAD = 30;
+    const BX = BOARD_PAD, BY = (CH - CELL * 3) / 2;
+
+    // Tree area
+    const TREE_X = BX + CELL * 3 + 50;
+    const TREE_W = CW - TREE_X - 10;
+    const TREE_H = CH - 20;
+
+    let board, currentPlayer, gameOver, winner, aiThinking;
+    let lastMCTSRoot = null;
+    let showingTree = false;
+    let statusMsg = '';
+
+    function initGame() {
+        board = [0, 0, 0, 0, 0, 0, 0, 0, 0]; // 0=empty, 1=X(human), 2=O(AI)
+        currentPlayer = 1;
+        gameOver = false;
+        winner = 0;
+        aiThinking = false;
+        lastMCTSRoot = null;
+        showingTree = false;
+        statusMsg = 'YOUR TURN (X)';
+    }
+    initGame();
+
+    // ---- Game logic ----
+    const WIN_LINES = [
+        [0, 1, 2], [3, 4, 5], [6, 7, 8],
+        [0, 3, 6], [1, 4, 7], [2, 5, 8],
+        [0, 4, 8], [2, 4, 6]
+    ];
+
+    function checkWin(b) {
+        for (const [a, bb, c] of WIN_LINES) {
+            if (b[a] && b[a] === b[bb] && b[bb] === b[c]) return b[a];
+        }
+        return b.includes(0) ? 0 : -1; // 0 = ongoing, -1 = draw
+    }
+
+    function getLegalMoves(b) {
+        const moves = [];
+        for (let i = 0; i < 9; i++) if (b[i] === 0) moves.push(i);
+        return moves;
+    }
+
+    // ---- MCTS ----
+    class MCTSNode {
+        constructor(board, player, move, parent) {
+            this.board = board.slice();
+            this.player = player; // player to move
+            this.move = move; // move that led here
+            this.parent = parent;
+            this.children = [];
+            this.visits = 0;
+            this.wins = 0;
+            this.untriedMoves = getLegalMoves(this.board);
+        }
+
+        ucb1(c = 1.41) {
+            if (this.visits === 0) return Infinity;
+            return (this.wins / this.visits) + c * Math.sqrt(Math.log(this.parent.visits) / this.visits);
+        }
+
+        bestChild() {
+            let best = this.children[0], bestScore = -Infinity;
+            for (const ch of this.children) {
+                const score = ch.ucb1();
+                if (score > bestScore) { bestScore = score; best = ch; }
+            }
+            return best;
+        }
+
+        expand() {
+            const idx = Math.floor(Math.random() * this.untriedMoves.length);
+            const move = this.untriedMoves.splice(idx, 1)[0];
+            const newBoard = this.board.slice();
+            newBoard[move] = this.player;
+            const child = new MCTSNode(newBoard, this.player === 1 ? 2 : 1, move, this);
+            this.children.push(child);
+            return child;
+        }
+
+        isFullyExpanded() { return this.untriedMoves.length === 0; }
+        isTerminal() { return checkWin(this.board) !== 0; }
+    }
+
+    function rollout(board, player) {
+        const b = board.slice();
+        let p = player;
+        let result = checkWin(b);
+        while (result === 0) {
+            const moves = getLegalMoves(b);
+            const move = moves[Math.floor(Math.random() * moves.length)];
+            b[move] = p;
+            p = p === 1 ? 2 : 1;
+            result = checkWin(b);
+        }
+        return result; // 1=X wins, 2=O wins, -1=draw
+    }
+
+    function backpropagate(node, result) {
+        while (node) {
+            node.visits++;
+            // From the node's perspective: the PARENT chose to reach this node.
+            // If result favors the opponent of node.player, that's good for parent.
+            if (result === -1) {
+                node.wins += 0.5; // Draw
+            } else if (result !== node.player) {
+                node.wins += 1; // Win for the player who moved to this node
+            }
+            node = node.parent;
+        }
+    }
+
+    function runMCTS(board, player, iterations) {
+        const root = new MCTSNode(board, player, -1, null);
+
+        for (let i = 0; i < iterations; i++) {
+            // 1. Select
+            let node = root;
+            while (!node.isTerminal() && node.isFullyExpanded() && node.children.length > 0) {
+                node = node.bestChild();
+            }
+
+            // 2. Expand
+            if (!node.isTerminal() && !node.isFullyExpanded()) {
+                node = node.expand();
+            }
+
+            // 3. Simulate (rollout)
+            const result = node.isTerminal() ? checkWin(node.board) : rollout(node.board, node.player);
+
+            // 4. Backpropagate
+            backpropagate(node, result);
+        }
+
+        return root;
+    }
+
+    function aiBestMove(root) {
+        let best = null, bestVisits = -1;
+        for (const ch of root.children) {
+            if (ch.visits > bestVisits) { bestVisits = ch.visits; best = ch; }
+        }
+        return best ? best.move : getLegalMoves(root.board)[0];
+    }
+
+    // ---- Drawing ----
+    function drawBoard() {
+        // Board background
+        ctx.fillStyle = '#111';
+        ctx.fillRect(BX - 5, BY - 5, CELL * 3 + 10, CELL * 3 + 10);
+        ctx.strokeStyle = '#333';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(BX - 5, BY - 5, CELL * 3 + 10, CELL * 3 + 10);
+
+        for (let i = 0; i < 9; i++) {
+            const r = Math.floor(i / 3), c = i % 3;
+            const x = BX + c * CELL, y = BY + r * CELL;
+
+            // Cell background
+            ctx.fillStyle = '#0a0a0a';
+            ctx.fillRect(x + 1, y + 1, CELL - 2, CELL - 2);
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(x, y, CELL, CELL);
+
+            // Pieces
+            if (board[i] === 1) {
+                // X
+                ctx.strokeStyle = '#ff0055';
+                ctx.lineWidth = 3;
+                ctx.shadowBlur = 4; ctx.shadowColor = '#ff0055';
+                ctx.beginPath();
+                ctx.moveTo(x + 12, y + 12); ctx.lineTo(x + CELL - 12, y + CELL - 12);
+                ctx.moveTo(x + CELL - 12, y + 12); ctx.lineTo(x + 12, y + CELL - 12);
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+            } else if (board[i] === 2) {
+                // O
+                ctx.strokeStyle = '#00e5ff';
+                ctx.lineWidth = 3;
+                ctx.shadowBlur = 4; ctx.shadowColor = '#00e5ff';
+                ctx.beginPath();
+                ctx.arc(x + CELL / 2, y + CELL / 2, CELL / 2 - 12, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+            }
+        }
+
+        // Win line highlight
+        if (winner > 0) {
+            for (const [a, b, c] of WIN_LINES) {
+                if (board[a] && board[a] === board[b] && board[b] === board[c]) {
+                    const ax = BX + (a % 3) * CELL + CELL / 2, ay = BY + Math.floor(a / 3) * CELL + CELL / 2;
+                    const cx2 = BX + (c % 3) * CELL + CELL / 2, cy = BY + Math.floor(c / 3) * CELL + CELL / 2;
+                    ctx.strokeStyle = winner === 1 ? '#ff0055' : '#00e5ff';
+                    ctx.lineWidth = 4;
+                    ctx.shadowBlur = 8; ctx.shadowColor = ctx.strokeStyle;
+                    ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(cx2, cy); ctx.stroke();
+                    ctx.shadowBlur = 0;
+                }
+            }
+        }
+
+        // Status
+        ctx.font = '11px Courier New';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = gameOver ? (winner === 1 ? '#ff0055' : winner === 2 ? '#00e5ff' : '#888') : '#888';
+        ctx.fillText(statusMsg, BX + CELL * 1.5, BY + CELL * 3 + 20);
+
+        // Labels
+        ctx.font = '9px Courier New';
+        ctx.fillStyle = '#555';
+        ctx.textAlign = 'center';
+        ctx.fillText('YOU (X)', BX + CELL * 1.5, BY - 12);
+    }
+
+    function drawTree() {
+        // Tree area background
+        ctx.fillStyle = '#0a0a0a';
+        ctx.fillRect(TREE_X, 10, TREE_W, TREE_H);
+        ctx.strokeStyle = '#222';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(TREE_X, 10, TREE_W, TREE_H);
+
+        ctx.font = '9px Courier New';
+        ctx.fillStyle = '#555';
+        ctx.textAlign = 'center';
+        ctx.fillText('MCTS SEARCH TREE', TREE_X + TREE_W / 2, 24);
+
+        if (!lastMCTSRoot || !showingTree) {
+            ctx.fillStyle = '#333';
+            ctx.font = '10px Courier New';
+            ctx.textAlign = 'center';
+            ctx.fillText('Click SHOW AI THINKING', TREE_X + TREE_W / 2, CH / 2 - 10);
+            ctx.fillText('to see the search tree', TREE_X + TREE_W / 2, CH / 2 + 8);
+            return;
+        }
+
+        const root = lastMCTSRoot;
+        if (root.children.length === 0) return;
+
+        // Layout tree nodes
+        const maxDepth = 3;
+        const maxVisits = Math.max(1, ...root.children.map(c => c.visits));
+
+        function drawNode(node, x, y, depth, widthBudget) {
+            if (depth > maxDepth) return;
+
+            // Draw this node
+            const winRate = node.visits > 0 ? node.wins / node.visits : 0;
+            const r = Math.max(4, Math.min(12, 4 + (node.visits / maxVisits) * 8));
+
+            // Color: green = good for AI (O), red = good for human (X)
+            const green = Math.floor(winRate * 200);
+            const red = Math.floor((1 - winRate) * 200);
+            ctx.fillStyle = `rgb(${red}, ${green}, 80)`;
+            ctx.beginPath();
+            ctx.arc(x, y, r, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#555';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            // Visit count label
+            if (depth <= 2 && node.visits > 0) {
+                ctx.font = '8px Courier New';
+                ctx.fillStyle = '#888';
+                ctx.textAlign = 'center';
+                ctx.fillText(`${node.visits}`, x, y + r + 10);
+                if (depth === 1) {
+                    const wr = Math.floor(winRate * 100);
+                    ctx.fillText(`${wr}%`, x, y + r + 19);
+                }
+            }
+
+            // Draw move symbol on depth 1
+            if (depth === 1 && node.move >= 0) {
+                ctx.font = '7px Courier New';
+                ctx.fillStyle = '#666';
+                ctx.textAlign = 'center';
+                const moveNames = ['TL', 'TC', 'TR', 'ML', 'MC', 'MR', 'BL', 'BC', 'BR'];
+                ctx.fillText(moveNames[node.move], x, y - r - 4);
+            }
+
+            // Sort children by visits for layout
+            const sortedChildren = node.children.slice().sort((a, b) => b.visits - a.visits);
+            const visibleChildren = sortedChildren.slice(0, Math.min(sortedChildren.length, depth === 0 ? 9 : 3));
+
+            if (visibleChildren.length === 0 || depth >= maxDepth) return;
+
+            const childWidth = widthBudget / visibleChildren.length;
+            const startX = x - widthBudget / 2 + childWidth / 2;
+            const childY = y + 65;
+
+            for (let i = 0; i < visibleChildren.length; i++) {
+                const ch = visibleChildren[i];
+                const cx = startX + i * childWidth;
+
+                // Draw edge
+                const edgeWidth = Math.max(0.5, (ch.visits / maxVisits) * 4);
+                const edgeAlpha = Math.max(0.2, ch.visits / maxVisits);
+                ctx.strokeStyle = `rgba(0, 229, 255, ${edgeAlpha})`;
+                ctx.lineWidth = edgeWidth;
+                ctx.beginPath();
+                ctx.moveTo(x, y + r);
+                ctx.lineTo(cx, childY - 4);
+                ctx.stroke();
+
+                drawNode(ch, cx, childY, depth + 1, childWidth * 0.85);
+            }
+        }
+
+        drawNode(root, TREE_X + TREE_W / 2, 45, 0, TREE_W - 20);
+
+        // Legend
+        ctx.font = '8px Courier New';
+        ctx.textAlign = 'left';
+        ctx.fillStyle = '#555';
+        ctx.fillText(`Total simulations: ${root.visits}`, TREE_X + 8, TREE_H - 2);
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, CW, CH);
+        drawBoard();
+        drawTree();
+    }
+
+    // ---- Interaction ----
+    canvas.addEventListener('click', (e) => {
+        if (gameOver || aiThinking || currentPlayer !== 1) return;
+
+        const rect = canvas.getBoundingClientRect();
+        const mx = (e.clientX - rect.left) * (CW / rect.width);
+        const my = (e.clientY - rect.top) * (CH / rect.height);
+
+        const col = Math.floor((mx - BX) / CELL);
+        const row = Math.floor((my - BY) / CELL);
+        if (col < 0 || col > 2 || row < 0 || row > 2) return;
+
+        const idx = row * 3 + col;
+        if (board[idx] !== 0) return;
+
+        // Human move
+        board[idx] = 1;
+        showingTree = false;
+        const result = checkWin(board);
+        if (result !== 0) {
+            gameOver = true;
+            winner = result === -1 ? 0 : result;
+            statusMsg = result === -1 ? 'DRAW!' : 'YOU WIN!';
+            draw();
+            return;
+        }
+
+        // AI turn
+        currentPlayer = 2;
+        aiThinking = true;
+        statusMsg = 'AI THINKING...';
+        draw();
+
+        setTimeout(() => {
+            lastMCTSRoot = runMCTS(board, 2, 1000);
+            const aiMove = aiBestMove(lastMCTSRoot);
+            board[aiMove] = 2;
+            aiThinking = false;
+
+            const result2 = checkWin(board);
+            if (result2 !== 0) {
+                gameOver = true;
+                winner = result2 === -1 ? 0 : result2;
+                statusMsg = result2 === -1 ? 'DRAW!' : 'AI WINS!';
+            } else {
+                currentPlayer = 1;
+                statusMsg = 'YOUR TURN (X)';
+            }
+            draw();
+        }, 50);
+    });
+
+    hintBtn.addEventListener('click', () => {
+        if (gameOver && !lastMCTSRoot) return;
+        if (!lastMCTSRoot) {
+            // Run MCTS for current position to show tree
+            lastMCTSRoot = runMCTS(board, currentPlayer, 1000);
+        }
+        showingTree = true;
+        draw();
+    });
+
+    resetBtn.addEventListener('click', () => {
+        initGame();
+        draw();
+    });
+
+    draw();
+})();
+
+// ==========================================
+// 15. DREAMING MACHINES (REVERSE DIFFUSION)
 // ==========================================
 (function () {
     const canvas = document.getElementById('diffusionCanvas');
