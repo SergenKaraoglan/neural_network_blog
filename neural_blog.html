@@ -536,8 +536,8 @@
         winning from here?"). The network guides the search toward strong moves, while the search generates
         training data to improve the network—a beautiful self-reinforcing loop.</p>
 
-    <div class="interactive-container" style="min-height: 520px; padding-bottom: 2rem;">
-        <canvas id="mctsCanvas" width="620" height="400"></canvas>
+    <div class="interactive-container" style="min-height: 820px; padding-bottom: 2rem;">
+        <canvas id="mctsCanvas" width="620" height="700"></canvas>
         <div class="controls">
             <button id="mcts-reset-btn">NEW GAME</button>
             <button id="mcts-hint-btn" style="background:#222; color:#00e5ff; border: 1px solid #00e5ff;">SHOW AI
@@ -545,8 +545,8 @@
         </div>
         <p
             style="font-size: 0.9rem; color: #888; text-align: center; margin-top: 1rem; font-family: 'Courier New', monospace;">
-            Play Tic-Tac-Toe against an MCTS agent. Click a cell to place X. The tree on the right shows
-            the AI's search process — thicker branches = more visits, color shows win probability.
+            Play Tic-Tac-Toe against an MCTS agent. Click a cell to place X. The right panel shows
+            the AI's move evaluation — taller bars = more simulations = higher confidence.
         </p>
     </div>
 

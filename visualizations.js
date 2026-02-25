@@ -1701,7 +1701,6 @@
 })();
 
 // ==========================================
-// ==========================================
 // 14. ALPHAZERO & MCTS — TIC-TAC-TOE
 // ==========================================
 (function () {
@@ -1713,29 +1712,32 @@
 
     const CW = canvas.width, CH = canvas.height;
 
-    // Board constants
-    const CELL = 50, BOARD_PAD = 30;
-    const BX = BOARD_PAD, BY = (CH - CELL * 3) / 2;
+    // Layout zones
+    const TOP_H = 360; // top zone for board + panel
+    const TREE_Y = TOP_H + 10; // tree zone starts here
 
-    // Tree area
-    const TREE_X = BX + CELL * 3 + 50;
-    const TREE_W = CW - TREE_X - 10;
-    const TREE_H = CH - 20;
+    // Board layout (in top zone)
+    const CELL = 56, BOARD_PAD = 25;
+    const BX = BOARD_PAD, BY = (TOP_H - CELL * 3) / 2;
+
+    // Right panel (in top zone)
+    const PANEL_X = BX + CELL * 3 + 40;
+    const PANEL_W = CW - PANEL_X - 10;
 
     let board, currentPlayer, gameOver, winner, aiThinking;
     let lastMCTSRoot = null;
-    let showingTree = false;
+    let showingAnalysis = false;
     let statusMsg = '';
 
     function initGame() {
-        board = [0, 0, 0, 0, 0, 0, 0, 0, 0]; // 0=empty, 1=X(human), 2=O(AI)
+        board = [0, 0, 0, 0, 0, 0, 0, 0, 0];
         currentPlayer = 1;
         gameOver = false;
         winner = 0;
         aiThinking = false;
         lastMCTSRoot = null;
-        showingTree = false;
-        statusMsg = 'YOUR TURN (X)';
+        showingAnalysis = false;
+        statusMsg = 'YOUR TURN — CLICK A CELL';
     }
     initGame();
 
@@ -1750,7 +1752,7 @@
         for (const [a, bb, c] of WIN_LINES) {
             if (b[a] && b[a] === b[bb] && b[bb] === b[c]) return b[a];
         }
-        return b.includes(0) ? 0 : -1; // 0 = ongoing, -1 = draw
+        return b.includes(0) ? 0 : -1;
     }
 
     function getLegalMoves(b) {
@@ -1763,20 +1765,18 @@
     class MCTSNode {
         constructor(board, player, move, parent) {
             this.board = board.slice();
-            this.player = player; // player to move
-            this.move = move; // move that led here
+            this.player = player;
+            this.move = move;
             this.parent = parent;
             this.children = [];
             this.visits = 0;
             this.wins = 0;
             this.untriedMoves = getLegalMoves(this.board);
         }
-
         ucb1(c = 1.41) {
             if (this.visits === 0) return Infinity;
             return (this.wins / this.visits) + c * Math.sqrt(Math.log(this.parent.visits) / this.visits);
         }
-
         bestChild() {
             let best = this.children[0], bestScore = -Infinity;
             for (const ch of this.children) {
@@ -1785,7 +1785,6 @@
             }
             return best;
         }
-
         expand() {
             const idx = Math.floor(Math.random() * this.untriedMoves.length);
             const move = this.untriedMoves.splice(idx, 1)[0];
@@ -1795,7 +1794,6 @@
             this.children.push(child);
             return child;
         }
-
         isFullyExpanded() { return this.untriedMoves.length === 0; }
         isTerminal() { return checkWin(this.board) !== 0; }
     }
@@ -1806,50 +1804,33 @@
         let result = checkWin(b);
         while (result === 0) {
             const moves = getLegalMoves(b);
-            const move = moves[Math.floor(Math.random() * moves.length)];
-            b[move] = p;
+            b[moves[Math.floor(Math.random() * moves.length)]] = p;
             p = p === 1 ? 2 : 1;
             result = checkWin(b);
         }
-        return result; // 1=X wins, 2=O wins, -1=draw
+        return result;
     }
 
     function backpropagate(node, result) {
         while (node) {
             node.visits++;
-            // From the node's perspective: the PARENT chose to reach this node.
-            // If result favors the opponent of node.player, that's good for parent.
-            if (result === -1) {
-                node.wins += 0.5; // Draw
-            } else if (result !== node.player) {
-                node.wins += 1; // Win for the player who moved to this node
-            }
+            if (result === -1) node.wins += 0.5;
+            else if (result !== node.player) node.wins += 1;
             node = node.parent;
         }
     }
 
     function runMCTS(board, player, iterations) {
         const root = new MCTSNode(board, player, -1, null);
-
         for (let i = 0; i < iterations; i++) {
-            // 1. Select
             let node = root;
             while (!node.isTerminal() && node.isFullyExpanded() && node.children.length > 0) {
                 node = node.bestChild();
             }
-
-            // 2. Expand
-            if (!node.isTerminal() && !node.isFullyExpanded()) {
-                node = node.expand();
-            }
-
-            // 3. Simulate (rollout)
+            if (!node.isTerminal() && !node.isFullyExpanded()) node = node.expand();
             const result = node.isTerminal() ? checkWin(node.board) : rollout(node.board, node.player);
-
-            // 4. Backpropagate
             backpropagate(node, result);
         }
-
         return root;
     }
 
@@ -1862,58 +1843,95 @@
     }
 
     // ---- Drawing ----
+    const CELL_NAMES = ['top-left', 'top-mid', 'top-right', 'mid-left', 'center', 'mid-right', 'bot-left', 'bot-mid', 'bot-right'];
+    const CELL_SHORT = ['TL', 'TC', 'TR', 'ML', 'C', 'MR', 'BL', 'BC', 'BR'];
+
     function drawBoard() {
         // Board background
         ctx.fillStyle = '#111';
         ctx.fillRect(BX - 5, BY - 5, CELL * 3 + 10, CELL * 3 + 10);
-        ctx.strokeStyle = '#333';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(BX - 5, BY - 5, CELL * 3 + 10, CELL * 3 + 10);
+
+        // Get move stats for overlay
+        let moveStats = {};
+        let maxVisits = 1;
+        let bestMove = -1;
+        if (lastMCTSRoot && showingAnalysis) {
+            for (const ch of lastMCTSRoot.children) {
+                moveStats[ch.move] = { visits: ch.visits, winRate: ch.visits > 0 ? ch.wins / ch.visits : 0 };
+                if (ch.visits > maxVisits) { maxVisits = ch.visits; bestMove = ch.move; }
+            }
+        }
 
         for (let i = 0; i < 9; i++) {
             const r = Math.floor(i / 3), c = i % 3;
             const x = BX + c * CELL, y = BY + r * CELL;
 
-            // Cell background
-            ctx.fillStyle = '#0a0a0a';
+            // Cell background with visit-count heat
+            if (board[i] === 0 && moveStats[i]) {
+                const intensity = moveStats[i].visits / maxVisits;
+                ctx.fillStyle = `rgba(0, 229, 255, ${intensity * 0.3})`;
+            } else {
+                ctx.fillStyle = '#0a0a0a';
+            }
             ctx.fillRect(x + 1, y + 1, CELL - 2, CELL - 2);
+
+            // Highlight best move
+            if (i === bestMove && showingAnalysis) {
+                ctx.strokeStyle = '#00e5ff';
+                ctx.lineWidth = 2;
+                ctx.shadowBlur = 6; ctx.shadowColor = '#00e5ff';
+                ctx.strokeRect(x + 2, y + 2, CELL - 4, CELL - 4);
+                ctx.shadowBlur = 0;
+            }
+
             ctx.strokeStyle = '#333';
             ctx.lineWidth = 1;
             ctx.strokeRect(x, y, CELL, CELL);
 
+            // Visit count overlay on empty cells
+            if (board[i] === 0 && moveStats[i] && moveStats[i].visits > 0) {
+                const ms = moveStats[i];
+                ctx.font = 'bold 11px Courier New';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = `rgba(0, 229, 255, ${0.4 + (ms.visits / maxVisits) * 0.6})`;
+                ctx.fillText(ms.visits, x + CELL / 2, y + CELL / 2 - 6);
+                ctx.font = '9px Courier New';
+                ctx.fillStyle = '#888';
+                ctx.fillText(Math.floor(ms.winRate * 100) + '%', x + CELL / 2, y + CELL / 2 + 8);
+            }
+
             // Pieces
             if (board[i] === 1) {
-                // X
                 ctx.strokeStyle = '#ff0055';
                 ctx.lineWidth = 3;
-                ctx.shadowBlur = 4; ctx.shadowColor = '#ff0055';
+                ctx.shadowBlur = 6; ctx.shadowColor = '#ff0055';
                 ctx.beginPath();
-                ctx.moveTo(x + 12, y + 12); ctx.lineTo(x + CELL - 12, y + CELL - 12);
-                ctx.moveTo(x + CELL - 12, y + 12); ctx.lineTo(x + 12, y + CELL - 12);
+                ctx.moveTo(x + 14, y + 14); ctx.lineTo(x + CELL - 14, y + CELL - 14);
+                ctx.moveTo(x + CELL - 14, y + 14); ctx.lineTo(x + 14, y + CELL - 14);
                 ctx.stroke();
                 ctx.shadowBlur = 0;
             } else if (board[i] === 2) {
-                // O
                 ctx.strokeStyle = '#00e5ff';
                 ctx.lineWidth = 3;
-                ctx.shadowBlur = 4; ctx.shadowColor = '#00e5ff';
+                ctx.shadowBlur = 6; ctx.shadowColor = '#00e5ff';
                 ctx.beginPath();
-                ctx.arc(x + CELL / 2, y + CELL / 2, CELL / 2 - 12, 0, Math.PI * 2);
+                ctx.arc(x + CELL / 2, y + CELL / 2, CELL / 2 - 14, 0, Math.PI * 2);
                 ctx.stroke();
                 ctx.shadowBlur = 0;
             }
         }
 
-        // Win line highlight
+        // Win line
         if (winner > 0) {
             for (const [a, b, c] of WIN_LINES) {
                 if (board[a] && board[a] === board[b] && board[b] === board[c]) {
                     const ax = BX + (a % 3) * CELL + CELL / 2, ay = BY + Math.floor(a / 3) * CELL + CELL / 2;
-                    const cx2 = BX + (c % 3) * CELL + CELL / 2, cy = BY + Math.floor(c / 3) * CELL + CELL / 2;
+                    const cx = BX + (c % 3) * CELL + CELL / 2, cy = BY + Math.floor(c / 3) * CELL + CELL / 2;
                     ctx.strokeStyle = winner === 1 ? '#ff0055' : '#00e5ff';
                     ctx.lineWidth = 4;
-                    ctx.shadowBlur = 8; ctx.shadowColor = ctx.strokeStyle;
-                    ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(cx2, cy); ctx.stroke();
+                    ctx.shadowBlur = 10; ctx.shadowColor = ctx.strokeStyle;
+                    ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(cx, cy); ctx.stroke();
                     ctx.shadowBlur = 0;
                 }
             }
@@ -1922,124 +1940,281 @@
         // Status
         ctx.font = '11px Courier New';
         ctx.textAlign = 'center';
+        ctx.textBaseline = 'alphabetic';
         ctx.fillStyle = gameOver ? (winner === 1 ? '#ff0055' : winner === 2 ? '#00e5ff' : '#888') : '#888';
-        ctx.fillText(statusMsg, BX + CELL * 1.5, BY + CELL * 3 + 20);
-
-        // Labels
-        ctx.font = '9px Courier New';
-        ctx.fillStyle = '#555';
-        ctx.textAlign = 'center';
-        ctx.fillText('YOU (X)', BX + CELL * 1.5, BY - 12);
+        ctx.fillText(statusMsg, BX + CELL * 1.5, BY + CELL * 3 + 22);
     }
 
-    function drawTree() {
-        // Tree area background
+    function drawPanel() {
+        // Panel background (top zone only)
         ctx.fillStyle = '#0a0a0a';
-        ctx.fillRect(TREE_X, 10, TREE_W, TREE_H);
+        ctx.fillRect(PANEL_X, 8, PANEL_W, TOP_H - 16);
         ctx.strokeStyle = '#222';
         ctx.lineWidth = 1;
-        ctx.strokeRect(TREE_X, 10, TREE_W, TREE_H);
+        ctx.strokeRect(PANEL_X, 8, PANEL_W, TOP_H - 16);
+
+        // ---- MCTS Phase Diagram ----
+        const phaseY = 22;
+        ctx.font = 'bold 9px Courier New';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#555';
+        ctx.fillText('MCTS ALGORITHM', PANEL_X + PANEL_W / 2, phaseY);
+
+        const phases = [
+            { name: 'SELECT', desc: 'Pick best path', color: '#ff0055' },
+            { name: 'EXPAND', desc: 'Add new node', color: '#ffaa00' },
+            { name: 'EVALUATE', desc: 'Simulate game', color: '#00e5ff' },
+            { name: 'BACKUP', desc: 'Update scores', color: '#00ff88' }
+        ];
+
+        const phaseW = (PANEL_W - 20) / 4;
+        for (let i = 0; i < 4; i++) {
+            const px = PANEL_X + 10 + i * phaseW;
+            const py = phaseY + 10;
+
+            // Phase box
+            ctx.fillStyle = phases[i].color;
+            ctx.globalAlpha = 0.15;
+            ctx.fillRect(px + 2, py, phaseW - 4, 32);
+            ctx.globalAlpha = 1;
+            ctx.strokeStyle = phases[i].color;
+            ctx.lineWidth = 1;
+            ctx.strokeRect(px + 2, py, phaseW - 4, 32);
+
+            // Phase label
+            ctx.font = 'bold 8px Courier New';
+            ctx.fillStyle = phases[i].color;
+            ctx.textAlign = 'center';
+            ctx.fillText(phases[i].name, px + phaseW / 2, py + 13);
+
+            ctx.font = '7px Courier New';
+            ctx.fillStyle = '#888';
+            ctx.fillText(phases[i].desc, px + phaseW / 2, py + 25);
+
+            // Arrow between phases
+            if (i < 3) {
+                ctx.fillStyle = '#555';
+                ctx.font = '10px sans-serif';
+                ctx.fillText('→', px + phaseW - 1, py + 16);
+            }
+        }
+
+        // Circular arrow from BACKUP back to SELECT
+        ctx.font = '8px Courier New';
+        ctx.fillStyle = '#555';
+        ctx.textAlign = 'center';
+        ctx.fillText('↻ repeat 1000×', PANEL_X + PANEL_W / 2, phaseY + 52);
+
+        // ---- Bar Chart of Move Evaluations ----
+        const chartY = phaseY + 68;
+        const chartH = TOP_H - chartY - 30;
 
         ctx.font = '9px Courier New';
         ctx.fillStyle = '#555';
         ctx.textAlign = 'center';
-        ctx.fillText('MCTS SEARCH TREE', TREE_X + TREE_W / 2, 24);
+        ctx.fillText('MOVE EVALUATIONS', PANEL_X + PANEL_W / 2, chartY - 4);
 
-        if (!lastMCTSRoot || !showingTree) {
+        if (!lastMCTSRoot || !showingAnalysis || lastMCTSRoot.children.length === 0) {
             ctx.fillStyle = '#333';
             ctx.font = '10px Courier New';
             ctx.textAlign = 'center';
-            ctx.fillText('Click SHOW AI THINKING', TREE_X + TREE_W / 2, CH / 2 - 10);
-            ctx.fillText('to see the search tree', TREE_X + TREE_W / 2, CH / 2 + 8);
+            ctx.fillText('Make a move, then click', PANEL_X + PANEL_W / 2, chartY + chartH / 2 - 6);
+            ctx.fillText('SHOW AI THINKING', PANEL_X + PANEL_W / 2, chartY + chartH / 2 + 10);
+            return;
+        }
+
+        const root = lastMCTSRoot;
+        const children = root.children.slice().sort((a, b) => b.visits - a.visits);
+        const maxV = Math.max(1, ...children.map(c => c.visits));
+        const barW = Math.min(28, (PANEL_W - 30) / children.length - 4);
+        const totalBarWidth = children.length * (barW + 4);
+        const startX = PANEL_X + (PANEL_W - totalBarWidth) / 2;
+
+        for (let i = 0; i < children.length; i++) {
+            const ch = children[i];
+            const bx = startX + i * (barW + 4);
+            const barH = (ch.visits / maxV) * (chartH - 30);
+            const barY = chartY + chartH - 18 - barH;
+            const winRate = ch.visits > 0 ? ch.wins / ch.visits : 0;
+
+            const g = Math.floor(winRate * 200 + 55);
+            const r = Math.floor((1 - winRate) * 200 + 55);
+            ctx.fillStyle = `rgb(${r}, ${g}, 80)`;
+            ctx.shadowBlur = 3; ctx.shadowColor = `rgb(${r}, ${g}, 80)`;
+            ctx.fillRect(bx, barY, barW, barH);
+            ctx.shadowBlur = 0;
+
+            if (ch.visits === maxV) {
+                ctx.fillStyle = '#00e5ff';
+                ctx.font = 'bold 10px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('★', bx + barW / 2, barY - 6);
+            }
+
+            ctx.font = '7px Courier New';
+            ctx.fillStyle = '#ccc';
+            ctx.textAlign = 'center';
+            if (barH > 15) ctx.fillText(ch.visits, bx + barW / 2, barY + 10);
+
+            ctx.font = '8px Courier New';
+            ctx.fillStyle = '#888';
+            ctx.fillText(CELL_SHORT[ch.move], bx + barW / 2, chartY + chartH - 4);
+
+            ctx.font = '7px Courier New';
+            ctx.fillStyle = '#666';
+            ctx.fillText(Math.floor(winRate * 100) + '%', bx + barW / 2, chartY + chartH + 7);
+        }
+
+        ctx.font = '8px Courier New';
+        ctx.fillStyle = '#555';
+        ctx.textAlign = 'left';
+        ctx.fillText(`${root.visits} simulations`, PANEL_X + 8, TOP_H - 18);
+    }
+
+    // ---- Search Tree ----
+    function drawTree() {
+        // Divider line
+        ctx.strokeStyle = '#333';
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(10, TOP_H + 2); ctx.lineTo(CW - 10, TOP_H + 2); ctx.stroke();
+
+        // Tree background
+        ctx.fillStyle = '#0a0a0a';
+        ctx.fillRect(10, TREE_Y, CW - 20, CH - TREE_Y - 8);
+        ctx.strokeStyle = '#222';
+        ctx.strokeRect(10, TREE_Y, CW - 20, CH - TREE_Y - 8);
+
+        ctx.font = 'bold 9px Courier New';
+        ctx.fillStyle = '#555';
+        ctx.textAlign = 'center';
+        ctx.fillText('SEARCH TREE', CW / 2, TREE_Y + 16);
+
+        if (!lastMCTSRoot || !showingAnalysis) {
+            ctx.fillStyle = '#333';
+            ctx.font = '10px Courier New';
+            ctx.textAlign = 'center';
+            ctx.fillText('Tree appears after AI moves', CW / 2, TREE_Y + (CH - TREE_Y) / 2);
             return;
         }
 
         const root = lastMCTSRoot;
         if (root.children.length === 0) return;
 
-        // Layout tree nodes
-        const maxDepth = 3;
+        const treeW = CW - 40;
+        const treeTop = TREE_Y + 26;
+        const treeH = CH - TREE_Y - 36;
         const maxVisits = Math.max(1, ...root.children.map(c => c.visits));
 
-        function drawNode(node, x, y, depth, widthBudget) {
-            if (depth > maxDepth) return;
-
-            // Draw this node
-            const winRate = node.visits > 0 ? node.wins / node.visits : 0;
-            const r = Math.max(4, Math.min(12, 4 + (node.visits / maxVisits) * 8));
-
-            // Color: green = good for AI (O), red = good for human (X)
-            const green = Math.floor(winRate * 200);
-            const red = Math.floor((1 - winRate) * 200);
-            ctx.fillStyle = `rgb(${red}, ${green}, 80)`;
-            ctx.beginPath();
-            ctx.arc(x, y, r, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.strokeStyle = '#555';
-            ctx.lineWidth = 1;
-            ctx.stroke();
-
-            // Visit count label
-            if (depth <= 2 && node.visits > 0) {
-                ctx.font = '8px Courier New';
-                ctx.fillStyle = '#888';
-                ctx.textAlign = 'center';
-                ctx.fillText(`${node.visits}`, x, y + r + 10);
-                if (depth === 1) {
-                    const wr = Math.floor(winRate * 100);
-                    ctx.fillText(`${wr}%`, x, y + r + 19);
+        // Draw a miniboard inside a tree node
+        function drawMiniBoard(brd, cx, cy, size) {
+            const cs = size / 3;
+            for (let i = 0; i < 9; i++) {
+                const mr = Math.floor(i / 3), mc = i % 3;
+                const nx = cx - size / 2 + mc * cs, ny = cy - size / 2 + mr * cs;
+                ctx.strokeStyle = '#444';
+                ctx.lineWidth = 0.5;
+                ctx.strokeRect(nx, ny, cs, cs);
+                if (brd[i] === 1) {
+                    ctx.strokeStyle = '#ff0055';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(nx + 2, ny + 2); ctx.lineTo(nx + cs - 2, ny + cs - 2);
+                    ctx.moveTo(nx + cs - 2, ny + 2); ctx.lineTo(nx + 2, ny + cs - 2);
+                    ctx.stroke();
+                } else if (brd[i] === 2) {
+                    ctx.strokeStyle = '#00e5ff';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.arc(nx + cs / 2, ny + cs / 2, cs / 2 - 2, 0, Math.PI * 2);
+                    ctx.stroke();
                 }
-            }
-
-            // Draw move symbol on depth 1
-            if (depth === 1 && node.move >= 0) {
-                ctx.font = '7px Courier New';
-                ctx.fillStyle = '#666';
-                ctx.textAlign = 'center';
-                const moveNames = ['TL', 'TC', 'TR', 'ML', 'MC', 'MR', 'BL', 'BC', 'BR'];
-                ctx.fillText(moveNames[node.move], x, y - r - 4);
-            }
-
-            // Sort children by visits for layout
-            const sortedChildren = node.children.slice().sort((a, b) => b.visits - a.visits);
-            const visibleChildren = sortedChildren.slice(0, Math.min(sortedChildren.length, depth === 0 ? 9 : 3));
-
-            if (visibleChildren.length === 0 || depth >= maxDepth) return;
-
-            const childWidth = widthBudget / visibleChildren.length;
-            const startX = x - widthBudget / 2 + childWidth / 2;
-            const childY = y + 65;
-
-            for (let i = 0; i < visibleChildren.length; i++) {
-                const ch = visibleChildren[i];
-                const cx = startX + i * childWidth;
-
-                // Draw edge
-                const edgeWidth = Math.max(0.5, (ch.visits / maxVisits) * 4);
-                const edgeAlpha = Math.max(0.2, ch.visits / maxVisits);
-                ctx.strokeStyle = `rgba(0, 229, 255, ${edgeAlpha})`;
-                ctx.lineWidth = edgeWidth;
-                ctx.beginPath();
-                ctx.moveTo(x, y + r);
-                ctx.lineTo(cx, childY - 4);
-                ctx.stroke();
-
-                drawNode(ch, cx, childY, depth + 1, childWidth * 0.85);
             }
         }
 
-        drawNode(root, TREE_X + TREE_W / 2, 45, 0, TREE_W - 20);
+        // Root node
+        const rootX = CW / 2, rootY = treeTop + 16;
+        drawMiniBoard(root.board, rootX, rootY, 30);
+        ctx.font = '7px Courier New';
+        ctx.fillStyle = '#888';
+        ctx.textAlign = 'center';
+        ctx.fillText(root.visits, rootX, rootY + 22);
 
-        // Legend
-        ctx.font = '8px Courier New';
-        ctx.textAlign = 'left';
-        ctx.fillStyle = '#555';
-        ctx.fillText(`Total simulations: ${root.visits}`, TREE_X + 8, TREE_H - 2);
+        // First-level children (all moves AI considered)
+        const sortedL1 = root.children.slice().sort((a, b) => b.visits - a.visits);
+        const showL1 = sortedL1.slice(0, Math.min(sortedL1.length, 9));
+        const l1Spacing = treeW / (showL1.length + 1);
+        const l1Y = rootY + 70;
+
+        for (let i = 0; i < showL1.length; i++) {
+            const child = showL1[i];
+            const cx = 20 + l1Spacing * (i + 1);
+            const winRate = child.visits > 0 ? child.wins / child.visits : 0;
+
+            // Edge from root
+            const edgeW = Math.max(0.5, (child.visits / maxVisits) * 4);
+            const alpha = Math.max(0.15, child.visits / maxVisits);
+            ctx.strokeStyle = `rgba(0, 229, 255, ${alpha})`;
+            ctx.lineWidth = edgeW;
+            ctx.beginPath(); ctx.moveTo(rootX, rootY + 18); ctx.lineTo(cx, l1Y - 18); ctx.stroke();
+
+            // Node background
+            const nSize = 28;
+            const isChosen = child.visits === maxVisits;
+            if (isChosen) {
+                ctx.shadowBlur = 6; ctx.shadowColor = '#00e5ff';
+                ctx.strokeStyle = '#00e5ff';
+                ctx.lineWidth = 1.5;
+                ctx.strokeRect(cx - nSize / 2 - 2, l1Y - nSize / 2 - 2, nSize + 4, nSize + 4);
+                ctx.shadowBlur = 0;
+            }
+
+            drawMiniBoard(child.board, cx, l1Y, nSize);
+
+            // Labels below
+            ctx.font = 'bold 8px Courier New';
+            ctx.textAlign = 'center';
+            ctx.fillStyle = isChosen ? '#00e5ff' : '#888';
+            ctx.fillText(CELL_SHORT[child.move], cx, l1Y + nSize / 2 + 10);
+            ctx.font = '7px Courier New';
+            ctx.fillStyle = '#777';
+            ctx.fillText(`${child.visits}`, cx - 14, l1Y + nSize / 2 + 20);
+            const wr = Math.floor(winRate * 100);
+            const wrColor = wr > 50 ? '#4a4' : wr > 30 ? '#aa4' : '#a44';
+            ctx.fillStyle = wrColor;
+            ctx.fillText(`${wr}%`, cx + 14, l1Y + nSize / 2 + 20);
+
+            // Second-level children (top 3 by visits)
+            const sortedL2 = child.children.slice().sort((a, b) => b.visits - a.visits);
+            const showL2 = sortedL2.slice(0, Math.min(sortedL2.length, 3));
+            if (showL2.length > 0 && l1Y + 100 < CH - 20) {
+                const l2Y = l1Y + 72;
+                const l2Spread = l1Spacing * 0.7;
+                const l2Spacing = showL2.length > 1 ? l2Spread / (showL2.length - 1) : 0;
+                const l2Start = cx - l2Spread / 2;
+                const childMax = Math.max(1, ...showL2.map(c => c.visits));
+
+                for (let j = 0; j < showL2.length; j++) {
+                    const gc = showL2[j];
+                    const gx = showL2.length === 1 ? cx : l2Start + j * l2Spacing;
+                    const gcAlpha = Math.max(0.1, gc.visits / maxVisits);
+                    ctx.strokeStyle = `rgba(255, 0, 85, ${gcAlpha})`;
+                    ctx.lineWidth = Math.max(0.3, (gc.visits / maxVisits) * 2);
+                    ctx.beginPath(); ctx.moveTo(cx, l1Y + nSize / 2 + 2); ctx.lineTo(gx, l2Y - 10); ctx.stroke();
+
+                    drawMiniBoard(gc.board, gx, l2Y, 20);
+                    ctx.font = '6px Courier New';
+                    ctx.fillStyle = '#666';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(gc.visits, gx, l2Y + 16);
+                }
+            }
+        }
     }
 
     function draw() {
         ctx.clearRect(0, 0, CW, CH);
         drawBoard();
+        drawPanel();
         drawTree();
     }
 
@@ -2058,9 +2233,9 @@
         const idx = row * 3 + col;
         if (board[idx] !== 0) return;
 
-        // Human move
         board[idx] = 1;
-        showingTree = false;
+        showingAnalysis = false;
+        lastMCTSRoot = null;
         const result = checkWin(board);
         if (result !== 0) {
             gameOver = true;
@@ -2070,10 +2245,9 @@
             return;
         }
 
-        // AI turn
         currentPlayer = 2;
         aiThinking = true;
-        statusMsg = 'AI THINKING...';
+        statusMsg = 'AI SEARCHING...';
         draw();
 
         setTimeout(() => {
@@ -2081,6 +2255,7 @@
             const aiMove = aiBestMove(lastMCTSRoot);
             board[aiMove] = 2;
             aiThinking = false;
+            showingAnalysis = true;
 
             const result2 = checkWin(board);
             if (result2 !== 0) {
@@ -2089,19 +2264,21 @@
                 statusMsg = result2 === -1 ? 'DRAW!' : 'AI WINS!';
             } else {
                 currentPlayer = 1;
-                statusMsg = 'YOUR TURN (X)';
+                statusMsg = 'YOUR TURN — CLICK A CELL';
             }
             draw();
         }, 50);
     });
 
     hintBtn.addEventListener('click', () => {
-        if (gameOver && !lastMCTSRoot) return;
-        if (!lastMCTSRoot) {
-            // Run MCTS for current position to show tree
-            lastMCTSRoot = runMCTS(board, currentPlayer, 1000);
+        if (lastMCTSRoot) {
+            showingAnalysis = true;
+            draw();
+            return;
         }
-        showingTree = true;
+        // Run MCTS to show analysis
+        lastMCTSRoot = runMCTS(board, currentPlayer, 1000);
+        showingAnalysis = true;
         draw();
     });
 
