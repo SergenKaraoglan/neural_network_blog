@@ -43,6 +43,30 @@
             margin-bottom: 1.5rem;
         }
 
+        .part-header {
+            margin-top: 6rem;
+            margin-bottom: 1rem;
+            padding-top: 3rem;
+            border-top: 1px solid #333;
+            text-align: center;
+        }
+
+        .part-header h3 {
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+            letter-spacing: 0.3em;
+            text-transform: uppercase;
+            color: #555;
+            margin-bottom: 0.3rem;
+        }
+
+        .part-header p {
+            font-size: 1.4rem;
+            color: #888;
+            font-weight: 300;
+            margin-bottom: 0;
+        }
+
         p {
             margin-bottom: 1.5rem;
         }
@@ -281,8 +305,18 @@
             list-style: none;
             padding: 0;
             margin: 0;
-            columns: 2;
-            column-gap: 2rem;
+        }
+
+        .toc-part {
+            font-family: 'Courier New', monospace;
+            font-size: 0.75rem;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: #555;
+            margin-top: 1rem;
+            margin-bottom: 0.3rem;
+            padding-top: 0.5rem;
+            border-top: 1px solid #1a1a1a;
         }
 
         .toc li {
@@ -321,10 +355,25 @@
             border: 1px solid #333;
         }
 
-        .tag-fundamentals { color: #00e5ff; border-color: #00e5ff33; }
-        .tag-intermediate { color: #ff9f00; border-color: #ff9f0033; }
-        .tag-advanced { color: #ff0055; border-color: #ff005533; }
-        .tag-generative { color: #a855f7; border-color: #a855f733; }
+        .tag-fundamentals {
+            color: #00e5ff;
+            border-color: #00e5ff33;
+        }
+
+        .tag-intermediate {
+            color: #ff9f00;
+            border-color: #ff9f0033;
+        }
+
+        .tag-advanced {
+            color: #ff0055;
+            border-color: #ff005533;
+        }
+
+        .tag-generative {
+            color: #a855f7;
+            border-color: #a855f733;
+        }
 
         /* Footer */
         footer {
@@ -343,7 +392,12 @@
 
         /* Responsive */
         @media (max-width: 640px) {
-            .toc ol { columns: 1; }
-            h1 { font-size: 2rem; }
-            h2 { font-size: 1.5rem; }
+
+            h1 {
+                font-size: 2rem;
+            }
+
+            h2 {
+                font-size: 1.5rem;
+            }
         }

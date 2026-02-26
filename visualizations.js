@@ -744,7 +744,695 @@
 })();
 
 // ==========================================
-// 10. THE MEMORIZATION PROBLEM (OVERFITTING)
+// 10. TOKENISATION (BPE VISUALISER)
+// ==========================================
+(function () {
+    const canvas = document.getElementById('tokenCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const mergeBtn = document.getElementById('token-merge-btn');
+    const resetBtn = document.getElementById('token-reset-btn');
+
+    const width = canvas.width, height = canvas.height;
+
+    // Corpus: multiple occurrences of common words so BPE has frequency data
+    const CORPUS_TEXT = "the cat sat on the mat the cat ate the rat";
+    const WORDS = CORPUS_TEXT.split(' ');
+
+    // State
+    let wordTokens = []; // Array of arrays: each word is an array of token strings
+    let merges = [];      // Array of {pair: [a,b], merged: string}
+    let animState = null; // {pairA, pairB, progress} for animation
+    let animId = null;
+
+    function initState() {
+        wordTokens = WORDS.map(w => w.split(''));
+        merges = [];
+        animState = null;
+        if (animId) { cancelAnimationFrame(animId); animId = null; }
+    }
+    initState();
+
+    // Count adjacent pairs across all words
+    function countPairs() {
+        const counts = new Map();
+        for (const tokens of wordTokens) {
+            for (let i = 0; i < tokens.length - 1; i++) {
+                const key = tokens[i] + '|' + tokens[i + 1];
+                counts.set(key, (counts.get(key) || 0) + 1);
+            }
+        }
+        return counts;
+    }
+
+    // Find the most frequent pair
+    function bestPair() {
+        const counts = countPairs();
+        let best = null, bestCount = 0;
+        for (const [key, count] of counts) {
+            if (count > bestCount) { bestCount = count; best = key; }
+        }
+        if (!best) return null;
+        const [a, b] = best.split('|');
+        return { a, b, count: bestCount };
+    }
+
+    // Apply one merge across the corpus
+    function applyMerge(a, b) {
+        const merged = a + b;
+        for (let w = 0; w < wordTokens.length; w++) {
+            const tokens = wordTokens[w];
+            const newTokens = [];
+            let i = 0;
+            while (i < tokens.length) {
+                if (i < tokens.length - 1 && tokens[i] === a && tokens[i + 1] === b) {
+                    newTokens.push(merged);
+                    i += 2;
+                } else {
+                    newTokens.push(tokens[i]);
+                    i++;
+                }
+            }
+            wordTokens[w] = newTokens;
+        }
+        return merged;
+    }
+
+    // Get unique vocabulary
+    function getVocab() {
+        const vocab = new Set();
+        for (const tokens of wordTokens) {
+            for (const t of tokens) vocab.add(t);
+        }
+        return [...vocab].sort((a, b) => a.length - b.length || a.localeCompare(b));
+    }
+
+    // Assign hue based on token length (longer = more cyan/merged)
+    function tokenColor(token, alpha) {
+        const len = token.length;
+        if (len === 1) return `rgba(180, 180, 180, ${alpha || 1})`;
+        if (len === 2) return `rgba(0, 229, 255, ${alpha || 0.7})`;
+        if (len === 3) return `rgba(0, 255, 136, ${alpha || 0.8})`;
+        return `rgba(168, 85, 247, ${alpha || 0.9})`; // Purple for 4+ char tokens
+    }
+
+    function tokenBgColor(token) {
+        const len = token.length;
+        if (len === 1) return 'rgba(180, 180, 180, 0.08)';
+        if (len === 2) return 'rgba(0, 229, 255, 0.12)';
+        if (len === 3) return 'rgba(0, 255, 136, 0.12)';
+        return 'rgba(168, 85, 247, 0.12)';
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, width, height);
+
+        // --- Header: merge count and vocab size ---
+        ctx.fillStyle = '#888';
+        ctx.font = '12px Courier New';
+        ctx.textAlign = 'left';
+        ctx.fillText(`MERGES: ${merges.length}`, 15, 22);
+
+        const vocab = getVocab();
+        ctx.textAlign = 'right';
+        ctx.fillText(`VOCAB SIZE: ${vocab.length}`, width - 15, 22);
+
+        // --- Draw tokenised corpus as boxes ---
+        const startY = 48;
+        const boxH = 28;
+        const boxPad = 4;
+        const wordGap = 18;
+        const lineH = boxH + 14;
+        let cx = 15, cy = startY;
+
+        ctx.font = 'bold 13px Courier New';
+        ctx.textBaseline = 'middle';
+
+        for (let w = 0; w < wordTokens.length; w++) {
+            const tokens = wordTokens[w];
+
+            // Calculate total word width to check for wrapping
+            let wordW = 0;
+            for (const t of tokens) {
+                wordW += ctx.measureText(t).width + boxPad * 2 + 3;
+            }
+            if (cx + wordW > width - 15 && cx > 15) {
+                cx = 15;
+                cy += lineH;
+            }
+
+            for (let i = 0; i < tokens.length; i++) {
+                const t = tokens[i];
+                const tw = ctx.measureText(t).width + boxPad * 2;
+
+                // Check if this pair is the highlighted one during animation
+                let isHighlight = false;
+                if (animState && w < wordTokens.length) {
+                    // We highlight BEFORE the merge, so we don't need this during post-merge draw
+                }
+
+                // Background box
+                ctx.fillStyle = tokenBgColor(t);
+                ctx.beginPath();
+                ctx.roundRect(cx, cy, tw, boxH, 4);
+                ctx.fill();
+
+                // Border
+                ctx.strokeStyle = tokenColor(t, 0.5);
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.roundRect(cx, cy, tw, boxH, 4);
+                ctx.stroke();
+
+                // Text
+                ctx.fillStyle = tokenColor(t, 1);
+                ctx.textAlign = 'center';
+                ctx.fillText(t, cx + tw / 2, cy + boxH / 2 + 1);
+
+                cx += tw + 3;
+            }
+
+            // Word gap (space indicator)
+            if (w < wordTokens.length - 1) {
+                ctx.fillStyle = '#333';
+                ctx.font = '10px Courier New';
+                ctx.textAlign = 'center';
+                ctx.fillText('·', cx + wordGap / 2 - 2, cy + boxH / 2);
+                ctx.font = 'bold 13px Courier New';
+                cx += wordGap;
+            }
+        }
+
+        // --- Merge history (recent merges) ---
+        const historyY = 200;
+        ctx.fillStyle = '#555';
+        ctx.font = '11px Courier New';
+        ctx.textAlign = 'left';
+        ctx.fillText('MERGE HISTORY:', 15, historyY);
+
+        const visibleMerges = merges.slice(-6);
+        for (let i = 0; i < visibleMerges.length; i++) {
+            const m = visibleMerges[i];
+            const idx = merges.length - visibleMerges.length + i;
+            const y = historyY + 18 + i * 20;
+            const alpha = 0.4 + 0.6 * ((i + 1) / visibleMerges.length);
+
+            ctx.fillStyle = `rgba(136, 136, 136, ${alpha})`;
+            ctx.font = '11px Courier New';
+            ctx.textAlign = 'left';
+            ctx.fillText(`${(idx + 1).toString().padStart(2, '0')}.`, 20, y);
+
+            ctx.fillStyle = `rgba(255, 0, 85, ${alpha})`;
+            ctx.fillText(`"${m.pair[0]}"`, 48, y);
+            ctx.fillStyle = `rgba(136, 136, 136, ${alpha})`;
+            ctx.fillText('+', 48 + ctx.measureText(`"${m.pair[0]}"`).width + 6, y);
+            ctx.fillStyle = `rgba(255, 0, 85, ${alpha})`;
+            ctx.fillText(`"${m.pair[1]}"`, 48 + ctx.measureText(`"${m.pair[0]}"  +  `).width, y);
+
+            ctx.fillStyle = `rgba(136, 136, 136, ${alpha})`;
+            const arrowX = 200;
+            ctx.fillText('→', arrowX, y);
+
+            ctx.fillStyle = `rgba(0, 229, 255, ${alpha})`;
+            ctx.font = 'bold 11px Courier New';
+            ctx.fillText(`"${m.merged}"`, arrowX + 18, y);
+
+            // Show frequency
+            ctx.fillStyle = `rgba(100, 100, 100, ${alpha})`;
+            ctx.font = '10px Courier New';
+            ctx.fillText(`(×${m.count})`, arrowX + 18 + ctx.measureText(`"${m.merged}"`).width + 8, y);
+        }
+
+        if (merges.length === 0) {
+            ctx.fillStyle = '#444';
+            ctx.font = '11px Courier New';
+            ctx.textAlign = 'left';
+            ctx.fillText('No merges yet. Click "MERGE STEP" to begin.', 20, historyY + 20);
+        }
+
+        // --- Vocabulary display ---
+        const vocabY = historyY;
+        ctx.fillStyle = '#555';
+        ctx.font = '11px Courier New';
+        ctx.textAlign = 'left';
+        ctx.fillText('VOCABULARY:', 340, vocabY);
+
+        let vx = 345, vy = vocabY + 18;
+        ctx.font = '11px Courier New';
+        for (let i = 0; i < vocab.length; i++) {
+            const v = vocab[i];
+            const vw = ctx.measureText(v).width + 12;
+            if (vx + vw > width - 10) {
+                vx = 345;
+                vy += 22;
+            }
+
+            // Small token chip
+            ctx.fillStyle = tokenBgColor(v);
+            ctx.beginPath();
+            ctx.roundRect(vx, vy - 10, vw, 18, 3);
+            ctx.fill();
+
+            ctx.strokeStyle = tokenColor(v, 0.3);
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.roundRect(vx, vy - 10, vw, 18, 3);
+            ctx.stroke();
+
+            ctx.fillStyle = tokenColor(v, 0.9);
+            ctx.textAlign = 'center';
+            ctx.fillText(v, vx + vw / 2, vy + 1);
+
+            vx += vw + 5;
+        }
+
+        // --- Next pair preview ---
+        const next = bestPair();
+        if (next) {
+            ctx.fillStyle = '#444';
+            ctx.font = '10px Courier New';
+            ctx.textAlign = 'left';
+            ctx.fillText(`NEXT: "${next.a}" + "${next.b}" (×${next.count})`, 15, height - 12);
+        } else {
+            ctx.fillStyle = '#444';
+            ctx.font = '10px Courier New';
+            ctx.textAlign = 'left';
+            ctx.fillText('All tokens fully merged.', 15, height - 12);
+            mergeBtn.disabled = true;
+            mergeBtn.innerText = 'FULLY MERGED';
+        }
+    }
+
+    // Merge with animation
+    function doMerge() {
+        const pair = bestPair();
+        if (!pair) return;
+
+        // Flash highlight before merge
+        mergeBtn.disabled = true;
+
+        // Record merge
+        const merged = applyMerge(pair.a, pair.b);
+        merges.push({ pair: [pair.a, pair.b], merged, count: pair.count });
+
+        // Animate: quick flash then settle
+        let flashProg = 0;
+        function flashStep() {
+            flashProg += 0.08;
+            if (flashProg >= 1) {
+                cancelAnimationFrame(animId);
+                animId = null;
+                mergeBtn.disabled = false;
+                draw();
+                return;
+            }
+            // Draw with a flash overlay on the merged tokens
+            draw();
+
+            // Highlight newly merged tokens with a glow
+            const startY = 48;
+            const boxH = 28;
+            const boxPad = 4;
+            const wordGap = 18;
+            const lineH = boxH + 14;
+            let cx = 15, cy = startY;
+            ctx.font = 'bold 13px Courier New';
+            ctx.textBaseline = 'middle';
+
+            const glowAlpha = Math.sin(flashProg * Math.PI) * 0.6;
+
+            for (let w = 0; w < wordTokens.length; w++) {
+                const tokens = wordTokens[w];
+                let wordW = 0;
+                for (const t of tokens) wordW += ctx.measureText(t).width + boxPad * 2 + 3;
+                if (cx + wordW > width - 15 && cx > 15) { cx = 15; cy += lineH; }
+
+                for (let i = 0; i < tokens.length; i++) {
+                    const t = tokens[i];
+                    const tw = ctx.measureText(t).width + boxPad * 2;
+
+                    if (t === merged) {
+                        ctx.shadowBlur = 15;
+                        ctx.shadowColor = '#00e5ff';
+                        ctx.strokeStyle = `rgba(0, 229, 255, ${glowAlpha})`;
+                        ctx.lineWidth = 2;
+                        ctx.beginPath();
+                        ctx.roundRect(cx, cy, tw, boxH, 4);
+                        ctx.stroke();
+                        ctx.shadowBlur = 0;
+                    }
+                    cx += tw + 3;
+                }
+                if (w < wordTokens.length - 1) cx += wordGap;
+            }
+
+            animId = requestAnimationFrame(flashStep);
+        }
+        animId = requestAnimationFrame(flashStep);
+    }
+
+    mergeBtn.addEventListener('click', doMerge);
+    resetBtn.addEventListener('click', () => {
+        initState();
+        mergeBtn.disabled = false;
+        mergeBtn.innerText = 'MERGE STEP';
+        draw();
+    });
+
+    draw();
+})();
+
+// ==========================================
+// 11. WORD EMBEDDINGS (VECTOR SPACE)
+// ==========================================
+(function () {
+    const canvas = document.getElementById('embeddingCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const analogyBtn = document.getElementById('embed-analogy-btn');
+    const resetBtn = document.getElementById('embed-reset-btn');
+
+    const width = canvas.width, height = canvas.height;
+
+    // 2D embedding positions (pre-computed for visual clarity)
+    // Arranged so semantic clusters are visible and analogy geometry works
+    const words = [
+        // Royalty cluster (top-right)
+        { text: 'king', x: 420, y: 100, vec: [0.82, 0.91], cat: 'royalty' },
+        { text: 'queen', x: 480, y: 200, vec: [0.88, 0.65], cat: 'royalty' },
+        { text: 'prince', x: 380, y: 150, vec: [0.73, 0.78], cat: 'royalty' },
+        { text: 'throne', x: 450, y: 50, vec: [0.85, 0.98], cat: 'royalty' },
+
+        // Gender cluster
+        { text: 'man', x: 280, y: 120, vec: [0.52, 0.87], cat: 'person' },
+        { text: 'woman', x: 340, y: 220, vec: [0.58, 0.61], cat: 'person' },
+        { text: 'boy', x: 240, y: 170, vec: [0.43, 0.74], cat: 'person' },
+        { text: 'girl', x: 300, y: 270, vec: [0.49, 0.48], cat: 'person' },
+
+        // Animal cluster (bottom-left)
+        { text: 'cat', x: 100, y: 300, vec: [0.15, 0.35], cat: 'animal' },
+        { text: 'dog', x: 140, y: 340, vec: [0.22, 0.28], cat: 'animal' },
+        { text: 'kitten', x: 60, y: 350, vec: [0.08, 0.25], cat: 'animal' },
+        { text: 'puppy', x: 180, y: 370, vec: [0.30, 0.21], cat: 'animal' },
+
+        // Action cluster (left-middle)
+        { text: 'run', x: 80, y: 160, vec: [0.10, 0.72], cat: 'action' },
+        { text: 'walk', x: 120, y: 200, vec: [0.18, 0.60], cat: 'action' },
+        { text: 'jump', x: 60, y: 120, vec: [0.06, 0.84], cat: 'action' },
+
+        // Object cluster (bottom-right)
+        { text: 'car', x: 440, y: 340, vec: [0.84, 0.22], cat: 'object' },
+        { text: 'house', x: 500, y: 300, vec: [0.92, 0.32], cat: 'object' },
+        { text: 'table', x: 480, y: 370, vec: [0.89, 0.18], cat: 'object' },
+    ];
+
+    const catColors = {
+        royalty: { fill: 'rgba(168, 85, 247, 0.9)', bg: 'rgba(168, 85, 247, 0.1)', border: 'rgba(168, 85, 247, 0.4)' },
+        person: { fill: 'rgba(0, 229, 255, 0.9)', bg: 'rgba(0, 229, 255, 0.1)', border: 'rgba(0, 229, 255, 0.4)' },
+        animal: { fill: 'rgba(0, 255, 136, 0.9)', bg: 'rgba(0, 255, 136, 0.1)', border: 'rgba(0, 255, 136, 0.4)' },
+        action: { fill: 'rgba(255, 159, 0, 0.9)', bg: 'rgba(255, 159, 0, 0.1)', border: 'rgba(255, 159, 0, 0.4)' },
+        object: { fill: 'rgba(255, 0, 85, 0.9)', bg: 'rgba(255, 0, 85, 0.1)', border: 'rgba(255, 0, 85, 0.4)' },
+    };
+
+    let hoveredWord = null;
+    let analogyState = 0; // 0=none, 1=show king-man, 2=show +woman, 3=show =queen
+    let analogyAnimProg = 0;
+    let analogyAnimId = null;
+
+    function getWord(name) {
+        return words.find(w => w.text === name);
+    }
+
+    function drawArrow(fromX, fromY, toX, toY, color, lineW, dashed) {
+        const angle = Math.atan2(toY - fromY, toX - fromX);
+        const headLen = 10;
+
+        ctx.strokeStyle = color;
+        ctx.lineWidth = lineW;
+        if (dashed) ctx.setLineDash([6, 4]);
+        ctx.beginPath();
+        ctx.moveTo(fromX, fromY);
+        ctx.lineTo(toX, toY);
+        ctx.stroke();
+        if (dashed) ctx.setLineDash([]);
+
+        // Arrowhead
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.moveTo(toX, toY);
+        ctx.lineTo(toX - headLen * Math.cos(angle - 0.4), toY - headLen * Math.sin(angle - 0.4));
+        ctx.lineTo(toX - headLen * Math.cos(angle + 0.4), toY - headLen * Math.sin(angle + 0.4));
+        ctx.closePath();
+        ctx.fill();
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, width, height);
+
+        // Background grid
+        ctx.strokeStyle = '#1a1a1a';
+        ctx.lineWidth = 1;
+        for (let x = 0; x < width; x += 40) {
+            ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, height); ctx.stroke();
+        }
+        for (let y = 0; y < height; y += 40) {
+            ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke();
+        }
+
+        // Title
+        ctx.fillStyle = '#555';
+        ctx.font = '11px Courier New';
+        ctx.textAlign = 'left';
+        ctx.fillText('2D EMBEDDING PROJECTION', 15, 20);
+
+        // Draw cluster regions (faint convex hull approximations)
+        const clusters = {};
+        for (const w of words) {
+            if (!clusters[w.cat]) clusters[w.cat] = [];
+            clusters[w.cat].push(w);
+        }
+        for (const [cat, members] of Object.entries(clusters)) {
+            const cx = members.reduce((s, m) => s + m.x, 0) / members.length;
+            const cy = members.reduce((s, m) => s + m.y, 0) / members.length;
+            const maxDist = Math.max(...members.map(m => Math.hypot(m.x - cx, m.y - cy))) + 35;
+
+            ctx.beginPath();
+            ctx.arc(cx, cy, maxDist, 0, Math.PI * 2);
+            ctx.fillStyle = catColors[cat].bg;
+            ctx.fill();
+            ctx.strokeStyle = catColors[cat].border;
+            ctx.lineWidth = 1;
+            ctx.setLineDash([4, 4]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Cluster label
+            ctx.fillStyle = catColors[cat].border;
+            ctx.font = '9px Courier New';
+            ctx.textAlign = 'center';
+            ctx.fillText(cat.toUpperCase(), cx, cy - maxDist - 5);
+        }
+
+        // Draw word dots
+        for (const w of words) {
+            const isHovered = hoveredWord === w;
+            const colors = catColors[w.cat];
+            const radius = isHovered ? 7 : 5;
+
+            // Dot
+            ctx.beginPath();
+            ctx.arc(w.x, w.y, radius, 0, Math.PI * 2);
+            ctx.fillStyle = colors.fill;
+            ctx.fill();
+
+            if (isHovered) {
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = colors.fill;
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+
+            // Label
+            ctx.fillStyle = isHovered ? '#fff' : colors.fill;
+            ctx.font = isHovered ? 'bold 13px Courier New' : '12px Courier New';
+            ctx.textAlign = 'center';
+            ctx.fillText(w.text, w.x, w.y - 12);
+        }
+
+        // Draw hovered word vector info
+        if (hoveredWord) {
+            const w = hoveredWord;
+            const infoX = 15, infoY = height - 55;
+
+            ctx.fillStyle = '#111';
+            ctx.fillRect(infoX - 5, infoY - 15, 280, 50);
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(infoX - 5, infoY - 15, 280, 50);
+
+            ctx.fillStyle = catColors[w.cat].fill;
+            ctx.font = 'bold 12px Courier New';
+            ctx.textAlign = 'left';
+            ctx.fillText(`"${w.text}"`, infoX, infoY);
+
+            ctx.fillStyle = '#888';
+            ctx.font = '11px Courier New';
+            ctx.fillText(`vec = [${w.vec[0].toFixed(2)}, ${w.vec[1].toFixed(2)}, ...]`, infoX, infoY + 18);
+        }
+
+        // Draw analogy vectors
+        if (analogyState >= 1) {
+            const king = getWord('king');
+            const man = getWord('man');
+            const woman = getWord('woman');
+            const queen = getWord('queen');
+            const prog = Math.min(1, analogyAnimProg);
+
+            // Step 1: king - man (the "royalty" direction)
+            if (analogyState >= 1) {
+                const p = analogyState === 1 ? prog : 1;
+                const dx = (king.x - man.x) * p;
+                const dy = (king.y - man.y) * p;
+                drawArrow(man.x, man.y, man.x + dx, man.y + dy, 'rgba(255, 0, 85, 0.8)', 2, false);
+
+                // Label
+                ctx.fillStyle = 'rgba(255, 0, 85, 0.8)';
+                ctx.font = '10px Courier New';
+                ctx.textAlign = 'center';
+                ctx.fillText('king − man', (king.x + man.x) / 2, (king.y + man.y) / 2 - 10);
+            }
+
+            // Step 2: + woman (apply the direction to "woman")
+            if (analogyState >= 2) {
+                const p = analogyState === 2 ? prog : 1;
+                const dx = (king.x - man.x) * p;
+                const dy = (king.y - man.y) * p;
+
+                // Draw the offset vector from woman
+                drawArrow(woman.x, woman.y, woman.x + dx, woman.y + dy, 'rgba(0, 229, 255, 0.8)', 2, true);
+
+                // Predicted point
+                const predX = woman.x + (king.x - man.x);
+                const predY = woman.y + (king.y - man.y);
+
+                if (analogyState >= 3) {
+                    // Show the result landing near queen
+                    ctx.beginPath();
+                    ctx.arc(predX, predY, 8, 0, Math.PI * 2);
+                    ctx.strokeStyle = '#00ff88';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                    ctx.shadowBlur = 15;
+                    ctx.shadowColor = '#00ff88';
+                    ctx.stroke();
+                    ctx.shadowBlur = 0;
+
+                    ctx.fillStyle = '#00ff88';
+                    ctx.font = 'bold 12px Courier New';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('≈ queen!', predX, predY - 15);
+
+                    // Draw dotted line from predicted to actual queen
+                    ctx.setLineDash([3, 3]);
+                    ctx.strokeStyle = 'rgba(0, 255, 136, 0.4)';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(predX, predY);
+                    ctx.lineTo(queen.x, queen.y);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
+
+                // Label
+                ctx.fillStyle = 'rgba(0, 229, 255, 0.8)';
+                ctx.font = '10px Courier New';
+                ctx.textAlign = 'center';
+                ctx.fillText('+ woman', (woman.x + woman.x + dx) / 2 + 15, (woman.y + woman.y + dy) / 2);
+            }
+
+            // Equation display at top
+            const eqParts = ['king', ' − ', 'man', ' + ', 'woman', ' ≈ ', 'queen'];
+            const eqColors = ['#a855f7', '#888', '#00e5ff', '#888', '#00e5ff', '#888', '#00ff88'];
+            const eqVisible = analogyState === 1 ? 3 : analogyState === 2 ? 5 : 7;
+
+            let eqX = width - 250;
+            ctx.font = 'bold 12px Courier New';
+            ctx.textAlign = 'left';
+            for (let i = 0; i < eqVisible; i++) {
+                ctx.fillStyle = eqColors[i];
+                ctx.fillText(eqParts[i], eqX, 20);
+                eqX += ctx.measureText(eqParts[i]).width;
+            }
+        }
+    }
+
+    // Mouse tracking for hover
+    canvas.addEventListener('mousemove', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        const mx = (e.clientX - rect.left) * scaleX;
+        const my = (e.clientY - rect.top) * scaleY;
+
+        hoveredWord = null;
+        for (const w of words) {
+            if (Math.hypot(mx - w.x, my - w.y) < 20) {
+                hoveredWord = w;
+                break;
+            }
+        }
+        canvas.style.cursor = hoveredWord ? 'pointer' : 'default';
+        if (analogyState === 0) draw();
+    });
+
+    canvas.addEventListener('mouseleave', () => {
+        hoveredWord = null;
+        if (analogyState === 0) draw();
+    });
+
+    // Analogy animation
+    function animateAnalogy() {
+        analogyAnimProg += 0.04;
+        if (analogyAnimProg >= 1.2) {
+            analogyAnimProg = 0;
+            analogyState++;
+            if (analogyState > 3) {
+                cancelAnimationFrame(analogyAnimId);
+                analogyAnimId = null;
+                analogyState = 3;
+                analogyBtn.disabled = false;
+                analogyBtn.innerText = 'SHOW ANALOGY';
+                draw();
+                return;
+            }
+        }
+        draw();
+        analogyAnimId = requestAnimationFrame(animateAnalogy);
+    }
+
+    analogyBtn.addEventListener('click', () => {
+        if (analogyAnimId) return;
+        analogyState = 1;
+        analogyAnimProg = 0;
+        analogyBtn.disabled = true;
+        analogyBtn.innerText = 'COMPUTING...';
+        analogyAnimId = requestAnimationFrame(animateAnalogy);
+    });
+
+    resetBtn.addEventListener('click', () => {
+        if (analogyAnimId) { cancelAnimationFrame(analogyAnimId); analogyAnimId = null; }
+        analogyState = 0;
+        analogyAnimProg = 0;
+        analogyBtn.disabled = false;
+        analogyBtn.innerText = 'SHOW ANALOGY';
+        draw();
+    });
+
+    draw();
+})();
+
+// ==========================================
+// 12. THE MEMORIZATION PROBLEM (OVERFITTING)
 // ==========================================
 (function () {
     const canvas = document.getElementById('overfitCanvas');

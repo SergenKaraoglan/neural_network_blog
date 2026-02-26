@@ -37,10 +37,15 @@
 
     <p>Let’s build one from absolute first principles.</p>
 
+
     <nav class="toc">
         <p class="toc-title">CONTENTS</p>
         <ol>
             <li><a href="#sec-context">The Winter and the Spring</a></li>
+        </ol>
+
+        <p class="toc-part">Part I — Fundamentals</p>
+        <ol start="1">
             <li><a href="#sec-line">The Art of Drawing a Line</a></li>
             <li><a href="#sec-curves">The Problem of Curves</a></li>
             <li><a href="#sec-arch">The Architecture</a></li>
@@ -48,15 +53,33 @@
             <li><a href="#sec-synthesis">The Synthesis</a></li>
             <li><a href="#sec-backprop">The Calculus of Blame</a></li>
             <li><a href="#sec-batches">Batches, Epochs, and Chaos</a></li>
-            <li><a href="#sec-cnn">Seeing the World (CNNs)</a></li>
-            <li><a href="#sec-attention">The Attention Mechanism</a></li>
             <li><a href="#sec-overfit">The Memorization Problem</a></li>
+        </ol>
+
+        <p class="toc-part">Part II — Language</p>
+        <ol start="9">
+            <li><a href="#sec-attention">The Attention Mechanism</a></li>
+            <li><a href="#sec-tokenisation">Breaking Words Apart (Tokenisation)</a></li>
+            <li><a href="#sec-embeddings">Words as Coordinates (Embeddings)</a></li>
             <li><a href="#sec-ssl">Teaching Without a Teacher</a></li>
-            <li><a href="#sec-rl">Learning by Doing (Reinforcement Learning)</a></li>
-            <li><a href="#sec-dqn">The Neural Strategist (Deep Q-Learning)</a></li>
-            <li><a href="#sec-mcts">Mastering Games (AlphaZero & MCTS)</a></li>
+        </ol>
+
+        <p class="toc-part">Part III — Vision</p>
+        <ol start="13">
+            <li><a href="#sec-cnn">Seeing the World (CNNs)</a></li>
             <li><a href="#sec-genai">Dreaming Machines (GenAI)</a></li>
             <li><a href="#sec-latent">The Space Between (Manifolds)</a></li>
+        </ol>
+
+        <p class="toc-part">Part IV — Reinforcement Learning</p>
+        <ol start="16">
+            <li><a href="#sec-rl">Learning by Doing</a></li>
+            <li><a href="#sec-dqn">The Neural Strategist (Deep Q-Learning)</a></li>
+            <li><a href="#sec-mcts">Mastering Games (AlphaZero &amp; MCTS)</a></li>
+        </ol>
+
+        <p class="toc-part">Closing</p>
+        <ol start="19">
             <li><a href="#sec-illusion">The Illusion of Intelligence</a></li>
             <li><a href="#sec-quiz">Test Your Understanding</a></li>
         </ol>
@@ -76,6 +99,11 @@
         networks in parallel.</p>
     <p>Suddenly, what took months to compute took hours. Researchers began adding more and more "Hidden Layers" to their
         models—hence the term <strong>Deep Learning</strong>. Let's look at how the layers and math actually work.</p>
+
+    <div class="part-header" id="part-fundamentals">
+        <h3>Part I</h3>
+        <p>Fundamentals</p>
+    </div>
 
     <span class="section-tag tag-fundamentals">FUNDAMENTALS</span>
     <h2 id="sec-line">1. The Art of Drawing a Line</h2>
@@ -294,70 +322,7 @@
         bottoms out in the deepest valley it can find.</p>
 
     <span class="section-tag tag-advanced">ADVANCED</span>
-    <h2 id="sec-cnn">8. Seeing the World (Convolutional Networks)</h2>
-    <p>We've talked about classifying fruit based on two numbers: weight and yellowness. But what if our input isn't a
-        couple of numbers, but an <em>image</em>—say, a 28x28 grid of pixels? That's 784 numbers. If we passed those 784
-        numbers into a standard feed-forward layer with 1,000 neurons, we would need 784,000 weights just for the first
-        layer.</p>
-
-    <p>Worse, traditional networks don't understand <em>spatial structure</em>. To a standard network, a circle in the
-        top-left corner is completely mathematically unrelated to a circle in the bottom-right corner. It has to learn
-        to identify circles all over again for every possible position.</p>
-
-    <p>To solve this, researchers invented the <strong>Convolutional Neural Network (CNN)</strong>. Instead of
-        connecting every pixel to every neuron, a CNN slides a small window—called a <strong>Kernel</strong> or
-        <strong>Filter</strong>—across the image.
-    </p>
-
-    <div class="interactive-container" style="min-height: 400px; padding-bottom: 2rem;">
-        <canvas id="cnnCanvas" width="600" height="300"></canvas>
-        <div class="controls">
-            <button id="cnn-scan-btn">SCAN IMAGE</button>
-        </div>
-        <p
-            style="font-size: 0.9rem; color: #888; text-align: center; margin-top: 1rem; font-family: 'Courier New', monospace;">
-            Watch the 3x3 filter slide across the input image. This specific filter looks for vertical edges, lighting
-            up bright cyan when it finds a transition from dark to light.
-        </p>
-    </div>
-
-    <p>As the filter slides, it calculates a dot product at every location, creating a new "feature map". By learning
-        the exact numbers inside these 3x3 filters through Backpropagation, the network organically learns to detect
-        edges, then corners, then eyes, then faces.</p>
-
-    <span class="section-tag tag-advanced">ADVANCED</span>
-    <h2 id="sec-attention">9. The Attention Mechanism (Transformers & LLMs)</h2>
-    <p>Everything we have built so far describes <strong>Feed-Forward Networks</strong>. They are powerful, but they
-        have a fatal flaw: they do not understand time or sequence. If you feed them the word "bank," they cannot tell
-        if you mean a river bank or a financial institution because they have no short-term memory of the words before
-        it.</p>
-
-    <p>For decades, researchers tried to solve this with recurrent loops (RNNs). But in 2017, a paper titled
-        <em>"Attention Is All You Need"</em> revolutionized AI by introducing the <strong>Transformer</strong>
-        architecture.
-    </p>
-
-    <p>The core innovation of the Transformer is <strong>Self-Attention</strong>. Instead of reading a sentence
-        sequentially, a Transformer looks at every single word simultaneously. For every word, it calculates an
-        "attention score" representing how strongly that word relates to every other word in the sequence.</p>
-
-    <div class="interactive-container" style="min-height: 400px; padding-bottom: 4rem;">
-        <canvas id="attentionCanvas" width="600" height="300"></canvas>
-        <div class="controls">
-            <div class="slider-group" style="width: 100%;">
-                <label>FOCAL WORD: <span id="attn-word-val">BANK</span></label>
-                <input type="range" id="attn-word-slider" min="0" max="6" step="1" value="6" style="width: 300px;">
-            </div>
-        </div>
-        <p
-            style="font-size: 0.9rem; color: #888; text-align: center; margin-top: 1rem; font-family: 'Courier New', monospace;">
-            Drag the slider to change the current focal word. Watch how the attention mechanism dynamically shifts its
-            weights to figure out the context. "Bank" attends heavily to "River".
-        </p>
-    </div>
-
-    <span class="section-tag tag-advanced">ADVANCED</span>
-    <h2 id="sec-overfit">10. The Memorization Problem (Overfitting & Regularization)</h2>
+    <h2 id="sec-overfit">8. The Memorization Problem (Overfitting & Regularization)</h2>
     <p>We've continuously added more power to our network: multi-dimensional hinges, deep layers, and self-attention.
         But power introduces a dangerous new problem. If you give a network millions of parameters to solve a simple
         dataset, it might stop looking for the underlying logical pattern and instead just <em>memorize</em> the
@@ -391,8 +356,128 @@
         network to use the simplest possible mathematical explanation.
     </p>
 
+    <div class="part-header" id="part-language">
+        <h3>Part II</h3>
+        <p>Language</p>
+    </div>
+
+    <span class="section-tag tag-advanced">ADVANCED</span>
+    <h2 id="sec-attention">9. The Attention Mechanism (Transformers & LLMs)</h2>
+    <p>Everything we have built so far describes <strong>Feed-Forward Networks</strong>. They are powerful, but they
+        have a fatal flaw: they do not understand time or sequence. If you feed them the word "bank," they cannot tell
+        if you mean a river bank or a financial institution because they have no short-term memory of the words before
+        it.</p>
+
+    <p>For decades, researchers tried to solve this with recurrent loops (RNNs). But in 2017, a paper titled
+        <em>"Attention Is All You Need"</em> revolutionized AI by introducing the <strong>Transformer</strong>
+        architecture.
+    </p>
+
+    <p>The core innovation of the Transformer is <strong>Self-Attention</strong>. Instead of reading a sentence
+        sequentially, a Transformer looks at every single word simultaneously. For every word, it calculates an
+        "attention score" representing how strongly that word relates to every other word in the sequence.</p>
+
+    <div class="interactive-container" style="min-height: 400px; padding-bottom: 4rem;">
+        <canvas id="attentionCanvas" width="600" height="300"></canvas>
+        <div class="controls">
+            <div class="slider-group" style="width: 100%;">
+                <label>FOCAL WORD: <span id="attn-word-val">BANK</span></label>
+                <input type="range" id="attn-word-slider" min="0" max="6" step="1" value="6" style="width: 300px;">
+            </div>
+        </div>
+        <p
+            style="font-size: 0.9rem; color: #888; text-align: center; margin-top: 1rem; font-family: 'Courier New', monospace;">
+            Drag the slider to change the current focal word. Watch how the attention mechanism dynamically shifts its
+            weights to figure out the context. "Bank" attends heavily to "River".
+        </p>
+    </div>
+
+    <span class="section-tag tag-advanced">ADVANCED</span>
+    <h2 id="sec-tokenisation">10. Breaking Words Apart (Tokenisation)</h2>
+    <p>We've just seen how Transformers use attention to understand relationships between words in a sentence. But
+        there's a deeper question we've been quietly ignoring: <em>how does the network see "words" in the first
+            place?</em> A neural network is a mathematical machine. It cannot read the letter "a." It needs
+        numbers.</p>
+
+    <p>The process of converting raw text into a sequence of numbers is called <strong>Tokenisation</strong>. It is
+        the critical first step in every language model, and the choice of tokeniser fundamentally shapes what the
+        model can learn.</p>
+
+    <p>The naïve approach is to split on whitespace and assign each unique word an ID. But this creates a
+        massive vocabulary—English alone has over 170,000 words, plus every name, typo, and technical term. Worse,
+        the model would see <em>"running"</em>, <em>"runner"</em>, and <em>"runs"</em> as completely
+        unrelated entries, learning nothing about their shared root.</p>
+
+    <p>The opposite extreme—splitting into individual characters—keeps the vocabulary tiny (just ~256 entries),
+        but each character carries almost no meaning. The model must burn enormous capacity just rediscovering that
+        <em>"t", "h", "e"</em> often appear together.
+    </p>
+
+    <p>The solution used by GPT, LLaMA, and virtually every modern LLM is <strong>Byte Pair Encoding
+            (BPE)</strong>. The idea is elegant: start with individual characters, then repeatedly merge the
+        most frequent adjacent pair into a single new token. Common words like <em>"the"</em> quickly become
+        single tokens, while rare words are gracefully decomposed into familiar subword pieces.</p>
+
+    <div class="interactive-container" style="min-height: 480px; padding-bottom: 2rem;">
+        <canvas id="tokenCanvas" width="600" height="380"></canvas>
+        <div class="controls">
+            <button id="token-merge-btn">MERGE STEP</button>
+            <button id="token-reset-btn"
+                style="background:#222; color:#00e5ff; border: 1px solid #00e5ff;">RESET</button>
+        </div>
+        <p
+            style="font-size: 0.9rem; color: #888; text-align: center; margin-top: 1rem; font-family: 'Courier New', monospace;">
+            Click "MERGE STEP" to perform one round of BPE. The most frequent adjacent pair
+            (highlighted in pink) merges into a single token. Watch common subwords emerge naturally from the data.
+        </p>
+    </div>
+
+    <p>After enough merges, the tokeniser has built a vocabulary of subword units—neither too large nor too
+        small. Each token is then mapped to a unique integer ID, and that sequence of IDs is what actually enters
+        the Transformer. The model never sees raw text; it sees a river of numbers, shaped by this algorithm.</p>
+
+    <span class="section-tag tag-advanced">ADVANCED</span>
+    <h2 id="sec-embeddings">11. Words as Coordinates (Embeddings)</h2>
+    <p>Tokenisation gives us integer IDs, but a raw number like <em>4,271</em> contains no meaning. The network
+        cannot tell that <em>"king"</em> (token 4,271) is conceptually closer to <em>"queen"</em> (token 8,903)
+        than to <em>"refrigerator"</em> (token 15,440). We need a richer representation.</p>
+
+    <p>The solution is an <strong>Embedding</strong>: each token ID is looked up in a giant table that maps it
+        to a vector—a list of numbers representing a coordinate in high-dimensional space. In GPT-3, every token
+        becomes a vector of <strong>12,288 numbers</strong>. These numbers are not hand-crafted; they are
+        <em>learned weights</em>, trained through backpropagation just like any other part of the network.
+    </p>
+
+    <p>The magic is in what the network discovers. During training, words that appear in similar contexts
+        ("king" near "throne", "queen" near "throne") get pushed toward similar regions of the space. The
+        geometry of this space encodes meaning: directions correspond to concepts. The famous result
+        <span class="equation">king − man + woman ≈ queen</span> is not a programmed rule—it is an emergent
+        property of the learned geometry.
+    </p>
+
+    <p>Below is a 2D projection of a small token embedding space. Semantically related words cluster together,
+        and the direction between clusters encodes relationships.</p>
+
+    <div class="interactive-container" style="min-height: 520px; padding-bottom: 2rem;">
+        <canvas id="embeddingCanvas" width="600" height="420"></canvas>
+        <div class="controls">
+            <button id="embed-analogy-btn">SHOW ANALOGY</button>
+            <button id="embed-reset-btn" style="background:#222; color:#00e5ff; border: 1px solid #00e5ff;">RESET
+                VIEW</button>
+        </div>
+        <p
+            style="font-size: 0.9rem; color: #888; text-align: center; margin-top: 1rem; font-family: 'Courier New', monospace;">
+            Hover over any word to see its vector. Click "SHOW ANALOGY" to watch
+            king − man + woman = queen unfold as pure vector arithmetic.
+        </p>
+    </div>
+
+    <p>This is why modern language models understand context so deeply. Every word in a sentence is not just
+        an ID—it is a point in a vast mathematical landscape, and the Transformer's attention mechanism operates
+        on these coordinates, computing distances and directions to derive meaning.</p>
+
     <span class="section-tag tag-generative">GENERATIVE</span>
-    <h2 id="sec-ssl">11. Teaching Without a Teacher (Self-Supervised Learning)</h2>
+    <h2 id="sec-ssl">12. Teaching Without a Teacher (Self-Supervised Learning)</h2>
     <p>Every technique we have built so far is <strong>supervised learning</strong>: a human must hand-label every
         piece of training data. "This image is a cat." "This fruit is lemon." "This email is spam." For every
         example the network learns from, a human had to sit down and write the answer. This is the bottleneck.
@@ -430,8 +515,126 @@
         what the clean version looks like—the "label" is just the original image before noise was added. This is
         self-supervised learning applied to pixels instead of words.</p>
 
+    <div class="part-header" id="part-vision">
+        <h3>Part III</h3>
+        <p>Vision</p>
+    </div>
+
     <span class="section-tag tag-advanced">ADVANCED</span>
-    <h2 id="sec-rl">12. Learning by Doing (Reinforcement Learning)</h2>
+    <h2 id="sec-cnn">13. Seeing the World (Convolutional Networks)</h2>
+    <p>We've talked about classifying fruit based on two numbers: weight and yellowness. But what if our input isn't a
+        couple of numbers, but an <em>image</em>—say, a 28x28 grid of pixels? That's 784 numbers. If we passed those 784
+        numbers into a standard feed-forward layer with 1,000 neurons, we would need 784,000 weights just for the first
+        layer.</p>
+
+    <p>Worse, traditional networks don't understand <em>spatial structure</em>. To a standard network, a circle in the
+        top-left corner is completely mathematically unrelated to a circle in the bottom-right corner. It has to learn
+        to identify circles all over again for every possible position.</p>
+
+    <p>To solve this, researchers invented the <strong>Convolutional Neural Network (CNN)</strong>. Instead of
+        connecting every pixel to every neuron, a CNN slides a small window—called a <strong>Kernel</strong> or
+        <strong>Filter</strong>—across the image.
+    </p>
+
+    <div class="interactive-container" style="min-height: 400px; padding-bottom: 2rem;">
+        <canvas id="cnnCanvas" width="600" height="300"></canvas>
+        <div class="controls">
+            <button id="cnn-scan-btn">SCAN IMAGE</button>
+        </div>
+        <p
+            style="font-size: 0.9rem; color: #888; text-align: center; margin-top: 1rem; font-family: 'Courier New', monospace;">
+            Watch the 3x3 filter slide across the input image. This specific filter looks for vertical edges, lighting
+            up bright cyan when it finds a transition from dark to light.
+        </p>
+    </div>
+
+    <p>As the filter slides, it calculates a dot product at every location, creating a new "feature map". By learning
+        the exact numbers inside these 3x3 filters through Backpropagation, the network organically learns to detect
+        edges, then corners, then eyes, then faces.</p>
+
+    <span class="section-tag tag-generative">GENERATIVE</span>
+    <h2 id="sec-genai">14. Dreaming Machines (Generative AI)</h2>
+    <p>Everything up to this point has been discriminative AI: looking at data and assigning it a boundary or a
+        probability. But what happens when we ask the network to generate brand new data? This is Generative AI.</p>
+
+    <p>For a long time, the dominant approach was the <strong>GAN (Generative Adversarial Network)</strong>. Imagine two
+        neural networks locked in a game of cat-and-mouse. The "Generator" network tries to forge a counterfeit painting
+        of a human face out of random static. The "Discriminator" network looks at both real faces and the counterfeits,
+        and tries to spot the fake. As they train against each other, the Generator gets so good at forging data that
+        the resulting images become indistinguishable from reality.</p>
+
+    <p>However, recent massive breakthroughs (like DALL-E and Midjourney) use <strong>Diffusion Models</strong>.
+        Diffusion works by taking an image of a dog, and slowly adding mathematical static (noise) to it over a thousand
+        steps until it looks like pure TV static. The Neural Network is then trained to do one specific job: look at the
+        static, and predict the noise that was added at the last step to subtract it. By doing this thousands of times,
+        the network essentially learns the mathematical process of pulling structure out of pure chaos, allowing us to
+        prompt it to pull a "dog in a spacesuit" out of a completely random, noisy canvas.</p>
+
+    <div class="interactive-container" style="min-height: 480px; padding-bottom: 2rem;">
+        <canvas id="diffusionCanvas" width="256" height="256"
+            style="width: 300px; height: 300px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.5);"></canvas>
+        <div class="controls">
+            <div class="slider-group" style="width: 100%;">
+                <label>DENOISING STEP (Reverse Diffusion): <span id="diff-val">100 (PURE NOISE)</span></label>
+                <input type="range" id="diff-slider" min="0" max="100" step="1" value="100" style="width: 300px;">
+            </div>
+        </div>
+        <p
+            style="font-size: 0.9rem; color: #888; text-align: center; margin-top: 1rem; font-family: 'Courier New', monospace;">
+            Drag the slider from 100 to 0 to simulate the AI generating an image. It starts with pure random noise and
+            mathematically subtracts the static step-by-step until the hidden structure emerges.
+        </p>
+    </div>
+
+    <span class="section-tag tag-generative">GENERATIVE</span>
+    <h2 id="sec-latent">15. The Space Between (Manifolds &amp; Latent Spaces)</h2>
+    <p>We've talked about how neural networks fold space and generate data, but <em>where</em> does that data come from?
+        When a model like Midjourney turns text into an image, it isn't pulling from a database; it's navigating a
+        <strong>Latent Space</strong>.
+    </p>
+
+    <p>Imagine a typical image is 1000x1000 pixels. Since every pixel has a red, green, and blue value, that image
+        exists
+        as a single point in a 3,000,000-dimensional mathematical space. But most of those 3 million dimensions are pure
+        noise.
+        The <strong>Manifold Hypothesis</strong> states that real-world data (like pictures of faces or cats) actually
+        lives on a much lower-dimensional, beautifully structured surface (a manifold) folded inside that massive space.
+    </p>
+
+    <p>A Neural Network acts like a massive data-compressor. By passing data through a bottleneck layer with very few
+        neurons, it forces the network to discover this hidden manifold. It distills 3 million pixels of a human face
+        down to perhaps just 500 pure, abstract numbers: one number might represent "age", another "lighting angle",
+        and another "smile width". This compressed, conceptual map is the Latent Space.</p>
+
+    <div class="interactive-container" style="min-height: 350px; flex-direction: row; gap: 40px; padding: 2rem;">
+        <div style="display:flex; flex-direction: column; align-items:center;">
+            <p style="font-family: 'Courier New', monospace; font-size: 14px; margin-bottom: 10px; font-weight: bold;">
+                LATENT MAP (2D Bottleneck)</p>
+            <canvas id="latentMapCanvas" width="200" height="200"
+                style="border: 2px solid #555; border-radius: 8px; cursor: crosshair;"></canvas>
+            <p style="font-size: 0.8rem; color: #888; margin-top: 10px;">Drag the red point</p>
+        </div>
+        <div style="display:flex; flex-direction: column; align-items:center;">
+            <p style="font-family: 'Courier New', monospace; font-size: 14px; margin-bottom: 10px; font-weight: bold;">
+                DECODED OUTPUT (Manifold)</p>
+            <canvas id="latentOutCanvas" width="200" height="200"
+                style="background: #1a1a1a; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.5);"></canvas>
+            <p style="font-size: 0.8rem; color: #888; margin-top: 10px;">Interpolated features</p>
+        </div>
+    </div>
+    <p
+        style="font-size: 0.9rem; color: #888; text-align: center; margin-bottom: 2rem; font-family: 'Courier New', monospace;">
+        Because the network is forced to learn a continuous manifold, moving slightly in the latent map results in a
+        smooth, logical transition in the generated output, blending discrete concepts together.
+    </p>
+
+    <div class="part-header" id="part-rl">
+        <h3>Part IV</h3>
+        <p>Reinforcement Learning</p>
+    </div>
+
+    <span class="section-tag tag-advanced">ADVANCED</span>
+    <h2 id="sec-rl">16. Learning by Doing (Reinforcement Learning)</h2>
     <p>Supervised learning needs labels. Self-supervised learning extracts labels from the data itself. But what about
         problems where there <em>is</em> no dataset at all—just an environment you can interact with?</p>
 
@@ -476,7 +679,7 @@
         across millions of possible states—turning brute-force memorization into genuine strategic reasoning.</p>
 
     <span class="section-tag tag-advanced">ADVANCED</span>
-    <h2 id="sec-dqn">13. The Neural Strategist (Deep Q-Learning)</h2>
+    <h2 id="sec-dqn">17. The Neural Strategist (Deep Q-Learning)</h2>
     <p>Our Q-Table from the previous section works beautifully for a small grid. But what happens when the
         state space explodes? A game of Atari has billions of possible screen configurations. A Go board has more
         legal positions than atoms in the universe. No table could ever hold all of those entries.</p>
@@ -518,7 +721,7 @@
     </p>
 
     <span class="section-tag tag-advanced">ADVANCED</span>
-    <h2 id="sec-mcts">14. Mastering Games (AlphaZero & MCTS)</h2>
+    <h2 id="sec-mcts">18. Mastering Games (AlphaZero & MCTS)</h2>
     <p>Deep Q-Networks learn to play games by trial and error, but there's a fundamentally different approach:
         <strong>planning ahead</strong>. When a chess grandmaster considers a move, they don't just react to the
         current board—they simulate future sequences of play, evaluating which paths lead to victory. This is
@@ -555,84 +758,8 @@
         strategies, sacrificial play, and deep positional ideas that humans had spent centuries developing.
         All from pure self-play, guided by search and a neural network working in concert.</p>
 
-    <span class="section-tag tag-generative">GENERATIVE</span>
-    <h2 id="sec-genai">15. Dreaming Machines (Generative AI)</h2>
-    <p>Everything up to this point has been discriminative AI: looking at data and assigning it a boundary or a
-        probability. But what happens when we ask the network to generate brand new data? This is Generative AI.</p>
-
-    <p>For a long time, the dominant approach was the <strong>GAN (Generative Adversarial Network)</strong>. Imagine two
-        neural networks locked in a game of cat-and-mouse. The "Generator" network tries to forge a counterfeit painting
-        of a human face out of random static. The "Discriminator" network looks at both real faces and the counterfeits,
-        and tries to spot the fake. As they train against each other, the Generator gets so good at forging data that
-        the resulting images become indistinguishable from reality.</p>
-
-    <p>However, recent massive breakthroughs (like DALL-E and Midjourney) use <strong>Diffusion Models</strong>.
-        Diffusion works by taking an image of a dog, and slowly adding mathematical static (noise) to it over a thousand
-        steps until it looks like pure TV static. The Neural Network is then trained to do one specific job: look at the
-        static, and predict the noise that was added at the last step to subtract it. By doing this thousands of times,
-        the network essentially learns the mathematical process of pulling structure out of pure chaos, allowing us to
-        prompt it to pull a "dog in a spacesuit" out of a completely random, noisy canvas.</p>
-
-    <div class="interactive-container" style="min-height: 480px; padding-bottom: 2rem;">
-        <canvas id="diffusionCanvas" width="256" height="256"
-            style="width: 300px; height: 300px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.5);"></canvas>
-        <div class="controls">
-            <div class="slider-group" style="width: 100%;">
-                <label>DENOISING STEP (Reverse Diffusion): <span id="diff-val">100 (PURE NOISE)</span></label>
-                <input type="range" id="diff-slider" min="0" max="100" step="1" value="100" style="width: 300px;">
-            </div>
-        </div>
-        <p
-            style="font-size: 0.9rem; color: #888; text-align: center; margin-top: 1rem; font-family: 'Courier New', monospace;">
-            Drag the slider from 100 to 0 to simulate the AI generating an image. It starts with pure random noise and
-            mathematically subtracts the static step-by-step until the hidden structure emerges.
-        </p>
-    </div>
-
-    <span class="section-tag tag-generative">GENERATIVE</span>
-    <h2 id="sec-latent">16. The Space Between (Manifolds &amp; Latent Spaces)</h2>
-    <p>We've talked about how neural networks fold space and generate data, but <em>where</em> does that data come from?
-        When a model like Midjourney turns text into an image, it isn't pulling from a database; it's navigating a
-        <strong>Latent Space</strong>.
-    </p>
-
-    <p>Imagine a typical image is 1000x1000 pixels. Since every pixel has a red, green, and blue value, that image
-        exists
-        as a single point in a 3,000,000-dimensional mathematical space. But most of those 3 million dimensions are pure
-        noise.
-        The <strong>Manifold Hypothesis</strong> states that real-world data (like pictures of faces or cats) actually
-        lives on a much lower-dimensional, beautifully structured surface (a manifold) folded inside that massive space.
-    </p>
-
-    <p>A Neural Network acts like a massive data-compressor. By passing data through a bottleneck layer with very few
-        neurons, it forces the network to discover this hidden manifold. It distills 3 million pixels of a human face
-        down to perhaps just 500 pure, abstract numbers: one number might represent "age", another "lighting angle",
-        and another "smile width". This compressed, conceptual map is the Latent Space.</p>
-
-    <div class="interactive-container" style="min-height: 350px; flex-direction: row; gap: 40px; padding: 2rem;">
-        <div style="display:flex; flex-direction: column; align-items:center;">
-            <p style="font-family: 'Courier New', monospace; font-size: 14px; margin-bottom: 10px; font-weight: bold;">
-                LATENT MAP (2D Bottleneck)</p>
-            <canvas id="latentMapCanvas" width="200" height="200"
-                style="border: 2px solid #555; border-radius: 8px; cursor: crosshair;"></canvas>
-            <p style="font-size: 0.8rem; color: #888; margin-top: 10px;">Drag the red point</p>
-        </div>
-        <div style="display:flex; flex-direction: column; align-items:center;">
-            <p style="font-family: 'Courier New', monospace; font-size: 14px; margin-bottom: 10px; font-weight: bold;">
-                DECODED OUTPUT (Manifold)</p>
-            <canvas id="latentOutCanvas" width="200" height="200"
-                style="background: #1a1a1a; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.5);"></canvas>
-            <p style="font-size: 0.8rem; color: #888; margin-top: 10px;">Interpolated features</p>
-        </div>
-    </div>
-    <p
-        style="font-size: 0.9rem; color: #888; text-align: center; margin-bottom: 2rem; font-family: 'Courier New', monospace;">
-        Because the network is forced to learn a continuous manifold, moving slightly in the latent map results in a
-        smooth, logical transition in the generated output, blending discrete concepts together.
-    </p>
-
     <span class="section-tag">PHILOSOPHY</span>
-    <h2 id="sec-illusion">17. The Illusion of Intelligence</h2>
+    <h2 id="sec-illusion">19. The Illusion of Intelligence</h2>
     <p>What is a Neural Network, truly? We have seen that it is not a brain. It does not "think." It is purely a
         parametric mathematical function. It is nothing more than a series of matrix multiplications interspersed with
         simple, non-linear hinges.</p>
