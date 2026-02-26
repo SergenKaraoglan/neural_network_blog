@@ -76,10 +76,11 @@
             <li><a href="#sec-rl">Learning by Doing</a></li>
             <li><a href="#sec-dqn">The Neural Strategist (Deep Q-Learning)</a></li>
             <li><a href="#sec-mcts">Mastering Games (AlphaZero &amp; MCTS)</a></li>
+            <li><a href="#sec-cot">Thinking Out Loud (Chain of Thought)</a></li>
         </ol>
 
         <p class="toc-part">Closing</p>
-        <ol start="19">
+        <ol start="20">
             <li><a href="#sec-illusion">The Illusion of Intelligence</a></li>
             <li><a href="#sec-quiz">Test Your Understanding</a></li>
         </ol>
@@ -758,8 +759,64 @@
         strategies, sacrificial play, and deep positional ideas that humans had spent centuries developing.
         All from pure self-play, guided by search and a neural network working in concert.</p>
 
+    <span class="section-tag tag-reasoning">REASONING</span>
+    <h2 id="sec-cot">19. Thinking Out Loud (Chain of Thought)</h2>
+    <p>Every technique we have built so far—self-supervised pre-training, attention, MCTS—produces
+        models that answer <em>instantly</em>. One forward pass, one prediction. For simple questions
+        this works beautifully. But ask a model to solve a hard math problem like <span class="equation">17 × 24</span>,
+        and it must somehow produce the answer in a single shot, with no scratch paper and no time to deliberate.
+        It is like asking a student to shout the answer without showing their work.</p>
+
+    <p>Humans don't think this way. We decompose: <em>"First, 17 × 20 = 340. Then 17 × 4 = 68.
+            So 340 + 68 = 408."</em> Each intermediate step reduces the difficulty of the next. This is
+        <strong>Chain of Thought (CoT)</strong> reasoning—and teaching a machine to do it turned out to be
+        one of the most important breakthroughs in modern AI.
+    </p>
+
+    <p>The naïve approach is to hire humans to write thousands of step-by-step reasoning traces and
+        fine-tune the model on them (supervised fine-tuning). This works, but it's expensive, slow, and
+        limited by the quality of the human examples. The <em>DeepSeek R1</em> paper asked a radical question:
+        <strong>what if we skip the human demonstrations entirely and let reinforcement learning discover
+            that thinking step-by-step is the optimal strategy?</strong>
+    </p>
+
+    <p>The method is called <strong>Group Relative Policy Optimization (GRPO)</strong>. Instead of training
+        a separate "critic" network (as in PPO), GRPO generates a <em>group</em> of candidate responses to
+        the same prompt, scores them by correctness, and updates the policy using the relative rankings within
+        the group. Responses that got the right answer are reinforced; those that failed are suppressed. No
+        human labels needed—just a rule that checks whether the final answer is correct.</p>
+
+    <p>Something remarkable happened during this pure RL training. At a certain point, the model spontaneously
+        began writing phrases like <em>"Wait, let me reconsider…"</em> and <em>"Hmm, that doesn't seem
+            right…"</em> in the middle of its reasoning chains. Nobody programmed this. The model <em>discovered</em>
+        self-correction on its own, because reflecting and catching mistakes led to more correct answers, which
+        led to higher rewards. The researchers called this the <strong>"Aha Moment"</strong>—an emergent behaviour
+        born purely from the reward signal.</p>
+
+    <div class="interactive-container" style="min-height: 480px; padding-bottom: 2rem;">
+        <canvas id="cotCanvas" width="600" height="370"></canvas>
+        <div class="controls">
+            <button id="cot-run-btn">GENERATE REASONING</button>
+            <button id="cot-next-btn" style="background:#222; color:#00e5ff; border: 1px solid #00e5ff;">NEW
+                PROMPT</button>
+        </div>
+        <p
+            style="font-size: 0.9rem; color: #888; text-align: center; margin-top: 1rem; font-family: 'Courier New', monospace;">
+            Watch the model "think out loud." Thought tokens stream inside the &lt;think&gt; tags.
+            The reward bar fills when the final answer is correct—reinforcing this reasoning strategy.
+        </p>
+    </div>
+
+    <p>The full DeepSeek R1 training pipeline refines this further. It begins with a small "cold start"
+        phase of supervised fine-tuning to teach the model basic formatting and coherence. Then the main RL
+        phase (GRPO) trains the model on thousands of reasoning problems. Next, the best reasoning traces are
+        harvested via rejection sampling to create new fine-tuning data. A final RL phase aligns the model
+        across both reasoning and general tasks. The result: a model that doesn't just answer—it
+        <em>thinks</em>, checks its work, and arrives at the answer through a chain of deliberate steps.
+    </p>
+
     <span class="section-tag">PHILOSOPHY</span>
-    <h2 id="sec-illusion">19. The Illusion of Intelligence</h2>
+    <h2 id="sec-illusion">20. The Illusion of Intelligence</h2>
     <p>What is a Neural Network, truly? We have seen that it is not a brain. It does not "think." It is purely a
         parametric mathematical function. It is nothing more than a series of matrix multiplications interspersed with
         simple, non-linear hinges.</p>
@@ -806,7 +863,7 @@ W2 = np.random.randn(3, 1)
     <p>It looks entirely alien compared to the pulsing brains of science fiction. It is just arrays of numbers,
         multiplied and selectively zeroed out, slowly falling down a mathematical valley.</p>
 
-    <h2 id="sec-quiz">Test Your Understanding</h2>
+    <h2 id="sec-quiz">21. Test Your Understanding</h2>
     <p>To truly understand it from first principles, you must build it yourself. Below is a live Python environment.
         Write the code for each core component we discussed. You can use <code>print()</code> to debug your logic—the
         output will appear in the console below.</p>

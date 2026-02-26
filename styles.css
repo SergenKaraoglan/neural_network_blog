@@ -375,6 +375,11 @@
             border-color: #a855f733;
         }
 
+        .tag-reasoning {
+            color: #fbbf24;
+            border-color: #fbbf2433;
+        }
+
         /* Footer */
         footer {
             margin-top: 6rem;

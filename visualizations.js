@@ -3330,3 +3330,314 @@
     drawMap();
     drawOutput();
 })();
+
+// ==========================================
+// 19. CHAIN OF THOUGHT (DeepSeek R1)
+// ==========================================
+(function () {
+    const canvas = document.getElementById('cotCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const runBtn = document.getElementById('cot-run-btn');
+    const nextBtn = document.getElementById('cot-next-btn');
+
+    const CW = canvas.width, CH = canvas.height;
+
+    const prompts = [
+        {
+            question: 'What is 17 × 24?',
+            thoughts: [
+                'Break this into parts...',
+                '17 × 20 = 340',
+                '17 × 4 = 68',
+                '340 + 68 = ...',
+                'Wait, let me verify:',
+                '68 + 340 = 408 ✓'
+            ],
+            answer: '408',
+            correct: true
+        },
+        {
+            question: 'Is 97 prime?',
+            thoughts: [
+                'Check divisibility...',
+                '97 / 2 = 48.5, no',
+                '97 / 3 = 32.3, no',
+                '97 / 5 = 19.4, no',
+                '97 / 7 = 13.8, no',
+                '√97 ≈ 9.8, done checking'
+            ],
+            answer: 'Yes, 97 is prime',
+            correct: true
+        },
+        {
+            question: 'Sum of 1 to 100?',
+            thoughts: [
+                'Pair numbers from ends...',
+                '1 + 100 = 101',
+                '2 + 99 = 101',
+                'There are 50 such pairs',
+                'Hmm, so 50 × 101 = ...',
+                'Wait: 50 × 100 = 5000',
+                '50 × 1 = 50',
+                '5000 + 50 = 5050 ✓'
+            ],
+            answer: '5050',
+            correct: true
+        },
+        {
+            question: 'What day follows the day before yesterday if today is Wednesday?',
+            thoughts: [
+                'Today is Wednesday...',
+                'Day before yesterday = Monday',
+                'Hmm, "follows" Monday...',
+                'Wait, re-read carefully:',
+                'The day that follows Monday',
+                'That would be Tuesday ✓'
+            ],
+            answer: 'Tuesday',
+            correct: true
+        }
+    ];
+
+    let currentPrompt = 0;
+    let visibleTokens = 0;
+    let showAnswer = false;
+    let animating = false;
+    let rewardProgress = 0;
+    let animFrame = null;
+
+    // Character-level streaming state
+    let charIndex = 0;
+    let lastCharTime = 0;
+    const CHAR_DELAY = 35; // ms between characters
+
+    function getPrompt() { return prompts[currentPrompt]; }
+
+    function drawStatic() {
+        ctx.clearRect(0, 0, CW, CH);
+
+        const p = getPrompt();
+
+        // Background
+        ctx.fillStyle = '#0a0a0a';
+        ctx.fillRect(0, 0, CW, CH);
+
+        // Prompt box
+        ctx.fillStyle = '#111';
+        ctx.strokeStyle = '#333';
+        ctx.lineWidth = 1;
+        const promptBoxH = 42;
+        ctx.fillRect(20, 12, CW - 40, promptBoxH);
+        ctx.strokeRect(20, 12, CW - 40, promptBoxH);
+
+        ctx.font = 'bold 11px Courier New';
+        ctx.fillStyle = '#888';
+        ctx.textAlign = 'left';
+        ctx.fillText('PROMPT:', 32, 30);
+        ctx.fillStyle = '#fff';
+        ctx.font = '14px Courier New';
+        ctx.fillText(p.question, 110, 30);
+
+        // Label
+        ctx.font = '9px Courier New';
+        ctx.fillStyle = '#555';
+        ctx.textAlign = 'right';
+        ctx.fillText('CHAIN OF THOUGHT', CW - 30, 48);
+
+        // Think tag area
+        const thinkY = 64;
+        const thinkH = 200;
+        ctx.fillStyle = '#0d0d0d';
+        ctx.strokeStyle = '#1a1a1a';
+        ctx.fillRect(20, thinkY, CW - 40, thinkH);
+        ctx.strokeRect(20, thinkY, CW - 40, thinkH);
+
+        // <think> tag
+        ctx.font = 'bold 11px Courier New';
+        ctx.textAlign = 'left';
+        ctx.fillStyle = '#fbbf24';
+        ctx.fillText('<think>', 30, thinkY + 18);
+
+        // Thought tokens with character-level streaming
+        const lineH = 22;
+        const startY = thinkY + 38;
+
+        // Calculate total characters up to charIndex
+        let charsRemaining = charIndex;
+        for (let i = 0; i < p.thoughts.length; i++) {
+            const thought = p.thoughts[i];
+            if (charsRemaining <= 0) break;
+
+            const displayChars = Math.min(charsRemaining, thought.length);
+            const displayText = thought.substring(0, displayChars);
+            charsRemaining -= displayChars;
+
+            const y = startY + i * lineH;
+
+            // Determine color based on content
+            const isReflection = thought.includes('Wait') || thought.includes('Hmm') || thought.includes('re-read');
+            const isVerify = thought.includes('✓') || thought.includes('verify');
+
+            if (isReflection) {
+                ctx.fillStyle = '#ff6b6b';
+                ctx.font = 'italic 12px Courier New';
+            } else if (isVerify) {
+                ctx.fillStyle = '#00ff88';
+                ctx.font = '12px Courier New';
+            } else {
+                ctx.fillStyle = '#888';
+                ctx.font = '12px Courier New';
+            }
+            ctx.textAlign = 'left';
+            ctx.fillText('  ' + displayText, 32, y);
+
+            // Blinking cursor at end of current line
+            if (displayChars < thought.length && displayChars > 0) {
+                const textW = ctx.measureText('  ' + displayText).width;
+                const blink = Math.floor(Date.now() / 400) % 2;
+                if (blink) {
+                    ctx.fillStyle = '#fbbf24';
+                    ctx.fillRect(34 + textW, y - 10, 7, 14);
+                }
+            }
+        }
+
+        // Closing think tag
+        let totalChars = p.thoughts.reduce((s, t) => s + t.length, 0);
+        if (charIndex >= totalChars) {
+            const closingY = startY + p.thoughts.length * lineH;
+            ctx.font = 'bold 11px Courier New';
+            ctx.fillStyle = '#fbbf24';
+            ctx.textAlign = 'left';
+            ctx.fillText('</think>', 30, closingY);
+        }
+
+        // Answer area
+        const answerY = thinkY + thinkH + 14;
+        if (showAnswer) {
+            ctx.fillStyle = '#111';
+            ctx.strokeStyle = '#00e5ff33';
+            ctx.lineWidth = 1;
+            ctx.fillRect(20, answerY, CW - 40, 34);
+            ctx.strokeRect(20, answerY, CW - 40, 34);
+
+            ctx.font = 'bold 11px Courier New';
+            ctx.fillStyle = '#555';
+            ctx.textAlign = 'left';
+            ctx.fillText('ANSWER:', 32, answerY + 22);
+            ctx.fillStyle = '#00e5ff';
+            ctx.font = 'bold 14px Courier New';
+            ctx.shadowBlur = 6; ctx.shadowColor = '#00e5ff';
+            ctx.fillText(p.answer, 110, answerY + 22);
+            ctx.shadowBlur = 0;
+        }
+
+        // Reward bar
+        const barY = answerY + 44;
+        const barW = CW - 80;
+        const barH = 16;
+        const barX = 40;
+
+        ctx.font = '9px Courier New';
+        ctx.fillStyle = '#555';
+        ctx.textAlign = 'left';
+        ctx.fillText('REWARD', barX, barY - 4);
+
+        // Bar background
+        ctx.fillStyle = '#111';
+        ctx.fillRect(barX, barY, barW, barH);
+        ctx.strokeStyle = '#333';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(barX, barY, barW, barH);
+
+        // Bar fill
+        if (rewardProgress > 0) {
+            const grad = ctx.createLinearGradient(barX, 0, barX + barW * rewardProgress, 0);
+            grad.addColorStop(0, '#00ff8833');
+            grad.addColorStop(1, '#00ff88');
+            ctx.fillStyle = grad;
+            ctx.fillRect(barX + 1, barY + 1, (barW - 2) * rewardProgress, barH - 2);
+
+            // Glow effect
+            if (rewardProgress >= 1) {
+                ctx.shadowBlur = 8; ctx.shadowColor = '#00ff88';
+                ctx.strokeStyle = '#00ff88';
+                ctx.lineWidth = 1.5;
+                ctx.strokeRect(barX, barY, barW, barH);
+                ctx.shadowBlur = 0;
+            }
+        }
+
+        // Reward label
+        ctx.font = 'bold 10px Courier New';
+        ctx.textAlign = 'right';
+        ctx.fillStyle = rewardProgress >= 1 ? '#00ff88' : '#555';
+        ctx.fillText(rewardProgress >= 1 ? '+1.0 CORRECT ✓' : (rewardProgress > 0 ? `+${rewardProgress.toFixed(1)}` : '0.0'), barX + barW - 4, barY + 12);
+
+        // GRPO label when fully done
+        if (rewardProgress >= 1) {
+            ctx.font = '9px Courier New';
+            ctx.fillStyle = '#fbbf24';
+            ctx.textAlign = 'center';
+            ctx.fillText('GRPO: reinforce this reasoning trace', CW / 2, barY + barH + 14);
+        }
+    }
+
+    function animate() {
+        const p = getPrompt();
+        const totalChars = p.thoughts.reduce((s, t) => s + t.length, 0);
+        const now = Date.now();
+
+        if (charIndex < totalChars) {
+            // Stream characters
+            if (now - lastCharTime > CHAR_DELAY) {
+                charIndex++;
+                lastCharTime = now;
+            }
+            drawStatic();
+            animFrame = requestAnimationFrame(animate);
+        } else if (!showAnswer) {
+            // Show answer after a brief pause
+            showAnswer = true;
+            drawStatic();
+            // Start reward fill
+            animFrame = requestAnimationFrame(animateReward);
+        }
+    }
+
+    function animateReward() {
+        if (rewardProgress < 1) {
+            rewardProgress = Math.min(1, rewardProgress + 0.025);
+            drawStatic();
+            animFrame = requestAnimationFrame(animateReward);
+        } else {
+            drawStatic();
+            animating = false;
+        }
+    }
+
+    runBtn.addEventListener('click', () => {
+        if (animating) return;
+        animating = true;
+        charIndex = 0;
+        visibleTokens = 0;
+        showAnswer = false;
+        rewardProgress = 0;
+        lastCharTime = Date.now();
+        animate();
+    });
+
+    nextBtn.addEventListener('click', () => {
+        if (animFrame) cancelAnimationFrame(animFrame);
+        animating = false;
+        currentPrompt = (currentPrompt + 1) % prompts.length;
+        charIndex = 0;
+        visibleTokens = 0;
+        showAnswer = false;
+        rewardProgress = 0;
+        drawStatic();
+    });
+
+    drawStatic();
+})();
