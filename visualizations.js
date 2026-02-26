@@ -3332,7 +3332,357 @@
 })();
 
 // ==========================================
-// 19. CHAIN OF THOUGHT (DeepSeek R1)
+// 9. RNN WORLD MODEL
+// ==========================================
+(function () {
+    const canvas = document.getElementById('rnnCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    const leftBtn = document.getElementById('rnn-left-btn');
+    const rightBtn = document.getElementById('rnn-right-btn');
+    const autoBtn = document.getElementById('rnn-auto-btn');
+    const resetBtn = document.getElementById('rnn-reset-btn');
+
+    const CW = canvas.width, CH = canvas.height;
+    const GRID_SIZE = 10;
+    const HIDDEN_SIZE = 6;
+
+    // State
+    let agentPos = 4;
+    let hiddenState = new Array(HIDDEN_SIZE).fill(0);
+    let predictedPos = -1;
+    let history = []; // {pos, action, nextPos}
+    let correct = 0;
+    let total = 0;
+    let autoWalking = false;
+    let autoTimer = null;
+    let animOffset = 0;
+    let lastPredictionCorrect = null;
+
+    // Simple learned weights (simulate RNN learning)
+    // The "model" learns a simple pattern: action -1 → pos decrements, action +1 → pos increments
+    let weights = { actionToHidden: new Array(HIDDEN_SIZE).fill(0), posToHidden: new Array(HIDDEN_SIZE).fill(0) };
+    let bias = 0;
+    let learnRate = 0.12;
+
+    function resetModel() {
+        agentPos = 4;
+        hiddenState = new Array(HIDDEN_SIZE).fill(0);
+        predictedPos = -1;
+        history = [];
+        correct = 0;
+        total = 0;
+        lastPredictionCorrect = null;
+        weights.actionToHidden = new Array(HIDDEN_SIZE).fill(0).map(() => (Math.random() - 0.5) * 0.3);
+        weights.posToHidden = new Array(HIDDEN_SIZE).fill(0).map(() => (Math.random() - 0.5) * 0.3);
+        bias = 0;
+        draw();
+    }
+
+    function sigmoid(x) {
+        return 1 / (1 + Math.exp(-Math.max(-10, Math.min(10, x))));
+    }
+
+    function rnnStep(pos, action) {
+        // Update hidden state
+        for (let i = 0; i < HIDDEN_SIZE; i++) {
+            const input = pos / GRID_SIZE * weights.posToHidden[i] + action * weights.actionToHidden[i] + hiddenState[i] * 0.5;
+            hiddenState[i] = Math.tanh(input);
+        }
+
+        // Predict next position from hidden state
+        let prediction = 0;
+        for (let i = 0; i < HIDDEN_SIZE; i++) {
+            prediction += hiddenState[i];
+        }
+        prediction = pos + Math.round(prediction / HIDDEN_SIZE * 2);
+        return Math.max(0, Math.min(GRID_SIZE - 1, prediction));
+    }
+
+    function learn(pos, action, actualNext) {
+        // Simple gradient: push weights toward correct mapping
+        const error = actualNext - predictedPos;
+        if (Math.abs(error) > 0) {
+            for (let i = 0; i < HIDDEN_SIZE; i++) {
+                weights.actionToHidden[i] += learnRate * error * action * 0.1;
+                weights.posToHidden[i] += learnRate * error * (pos / GRID_SIZE) * 0.05;
+            }
+        }
+    }
+
+    function step(action) {
+        const oldPos = agentPos;
+
+        // Get prediction BEFORE moving
+        predictedPos = rnnStep(oldPos, action);
+
+        // Actually move
+        const newPos = Math.max(0, Math.min(GRID_SIZE - 1, oldPos + action));
+        agentPos = newPos;
+
+        // Score
+        total++;
+        lastPredictionCorrect = predictedPos === newPos;
+        if (lastPredictionCorrect) correct++;
+
+        // Learn from this step
+        learn(oldPos, action, newPos);
+
+        history.push({ pos: oldPos, action, nextPos: newPos });
+        if (history.length > 30) history.shift();
+
+        draw();
+    }
+
+    function draw() {
+        animOffset = (animOffset + 0.02) % (Math.PI * 2);
+        ctx.clearRect(0, 0, CW, CH);
+
+        // Background
+        ctx.fillStyle = '#0a0a0a';
+        ctx.fillRect(0, 0, CW, CH);
+
+        // Title labels
+        ctx.font = '9px Courier New';
+        ctx.fillStyle = '#555';
+        ctx.textAlign = 'left';
+        ctx.fillText('WORLD MODEL', 20, 18);
+
+        ctx.textAlign = 'right';
+        ctx.fillText('RNN PREDICTION', CW - 20, 18);
+
+        // === GRID (top area) ===
+        const gridY = 40;
+        const cellW = (CW - 80) / GRID_SIZE;
+        const cellH = 42;
+        const gridX = 40;
+
+        ctx.font = '8px Courier New';
+        ctx.fillStyle = '#333';
+        ctx.textAlign = 'left';
+        ctx.fillText('ENVIRONMENT', gridX, gridY - 6);
+
+        for (let i = 0; i < GRID_SIZE; i++) {
+            const x = gridX + i * cellW;
+            ctx.fillStyle = '#111';
+            ctx.strokeStyle = '#222';
+            ctx.lineWidth = 1;
+            ctx.fillRect(x, gridY, cellW - 2, cellH);
+            ctx.strokeRect(x, gridY, cellW - 2, cellH);
+
+            // Cell index
+            ctx.font = '8px Courier New';
+            ctx.fillStyle = '#333';
+            ctx.textAlign = 'center';
+            ctx.fillText(i, x + cellW / 2 - 1, gridY + cellH + 12);
+        }
+
+        // Prediction ghost (draw before agent so agent renders on top)
+        if (predictedPos >= 0 && total > 0) {
+            const px = gridX + predictedPos * cellW + cellW / 2 - 1;
+            const py = gridY + cellH / 2;
+            ctx.save();
+            ctx.globalAlpha = 0.35 + 0.15 * Math.sin(animOffset * 3);
+            ctx.beginPath();
+            ctx.arc(px, py, 14, 0, Math.PI * 2);
+            const predColor = lastPredictionCorrect ? '#00ff88' : '#ff6b6b';
+            ctx.fillStyle = predColor;
+            ctx.fill();
+            ctx.restore();
+
+            // Label
+            ctx.font = '8px Courier New';
+            ctx.fillStyle = lastPredictionCorrect ? '#00ff88' : '#ff6b6b';
+            ctx.textAlign = 'center';
+            ctx.fillText(lastPredictionCorrect ? 'PREDICTED ✓' : 'PREDICTED ✗', px, py - 20);
+        }
+
+        // Agent
+        const ax = gridX + agentPos * cellW + cellW / 2 - 1;
+        const ay = gridY + cellH / 2;
+        ctx.beginPath();
+        ctx.arc(ax, ay, 12, 0, Math.PI * 2);
+        ctx.fillStyle = '#00e5ff';
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = '#00e5ff';
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        ctx.font = 'bold 9px Courier New';
+        ctx.fillStyle = '#000';
+        ctx.textAlign = 'center';
+        ctx.fillText('A', ax, ay + 3);
+
+        // === HIDDEN STATE (middle area) ===
+        const hsY = gridY + cellH + 38;
+        const hsCellW = 70;
+        const hsCellH = 36;
+        const hsX = (CW - HIDDEN_SIZE * hsCellW) / 2;
+
+        ctx.font = '8px Courier New';
+        ctx.fillStyle = '#333';
+        ctx.textAlign = 'left';
+        ctx.fillText('HIDDEN STATE h(t)', hsX, hsY - 6);
+
+        // Connection lines from grid to hidden
+        ctx.strokeStyle = '#151515';
+        ctx.lineWidth = 0.5;
+        for (let i = 0; i < HIDDEN_SIZE; i++) {
+            ctx.beginPath();
+            ctx.moveTo(ax, gridY + cellH);
+            ctx.lineTo(hsX + i * hsCellW + hsCellW / 2, hsY);
+            ctx.stroke();
+        }
+
+        for (let i = 0; i < HIDDEN_SIZE; i++) {
+            const x = hsX + i * hsCellW;
+            const val = hiddenState[i];
+            const absVal = Math.abs(val);
+
+            // Cell background with activation color
+            const r = val < 0 ? Math.floor(absVal * 200) : 0;
+            const g = val > 0 ? Math.floor(absVal * 200) : 0;
+            const b = 30;
+            ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+            ctx.fillRect(x, hsY, hsCellW - 4, hsCellH);
+
+            // Glow for strong activations
+            if (absVal > 0.3) {
+                ctx.strokeStyle = val > 0 ? `rgba(0, ${Math.floor(absVal * 255)}, 0, 0.5)` : `rgba(${Math.floor(absVal * 255)}, 0, 0, 0.5)`;
+                ctx.lineWidth = 1.5;
+                ctx.strokeRect(x, hsY, hsCellW - 4, hsCellH);
+            } else {
+                ctx.strokeStyle = '#222';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(x, hsY, hsCellW - 4, hsCellH);
+            }
+
+            // Value label
+            ctx.font = '10px Courier New';
+            ctx.fillStyle = '#888';
+            ctx.textAlign = 'center';
+            ctx.fillText(val.toFixed(2), x + hsCellW / 2 - 2, hsY + hsCellH / 2 + 4);
+        }
+
+        // Recurrence arrow
+        const arrowY = hsY + hsCellH + 6;
+        ctx.strokeStyle = '#fbbf24';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 3]);
+        ctx.beginPath();
+        ctx.moveTo(hsX + HIDDEN_SIZE * hsCellW - 4, hsY + hsCellH / 2);
+        ctx.lineTo(hsX + HIDDEN_SIZE * hsCellW + 16, hsY + hsCellH / 2);
+        ctx.lineTo(hsX + HIDDEN_SIZE * hsCellW + 16, hsY + hsCellH + 16);
+        ctx.lineTo(hsX - 16, hsY + hsCellH + 16);
+        ctx.lineTo(hsX - 16, hsY + hsCellH / 2);
+        ctx.lineTo(hsX, hsY + hsCellH / 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Arrow head
+        ctx.fillStyle = '#fbbf24';
+        ctx.beginPath();
+        ctx.moveTo(hsX, hsY + hsCellH / 2);
+        ctx.lineTo(hsX - 6, hsY + hsCellH / 2 - 4);
+        ctx.lineTo(hsX - 6, hsY + hsCellH / 2 + 4);
+        ctx.fill();
+
+        ctx.font = '8px Courier New';
+        ctx.fillStyle = '#fbbf24';
+        ctx.textAlign = 'center';
+        ctx.fillText('h(t) → h(t+1)', CW / 2, arrowY + 20);
+
+        // === ACCURACY (bottom area) ===
+        const accY = arrowY + 38;
+        const barW = CW - 80;
+        const barH = 16;
+        const accPct = total > 0 ? correct / total : 0;
+
+        ctx.font = '9px Courier New';
+        ctx.fillStyle = '#555';
+        ctx.textAlign = 'left';
+        ctx.fillText('PREDICTION ACCURACY', 40, accY - 4);
+
+        // Bar
+        ctx.fillStyle = '#111';
+        ctx.fillRect(40, accY, barW, barH);
+        ctx.strokeStyle = '#333';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(40, accY, barW, barH);
+
+        if (accPct > 0) {
+            const grad = ctx.createLinearGradient(40, 0, 40 + barW * accPct, 0);
+            grad.addColorStop(0, '#00e5ff33');
+            grad.addColorStop(1, '#00e5ff');
+            ctx.fillStyle = grad;
+            ctx.fillRect(41, accY + 1, (barW - 2) * accPct, barH - 2);
+        }
+
+        ctx.font = 'bold 10px Courier New';
+        ctx.textAlign = 'right';
+        ctx.fillStyle = accPct > 0.7 ? '#00ff88' : (accPct > 0.4 ? '#fbbf24' : '#888');
+        ctx.fillText(`${correct}/${total} (${(accPct * 100).toFixed(0)}%)`, 40 + barW - 4, accY + 12);
+
+        // === STEP HISTORY (bottom strip) ===
+        const histY = accY + barH + 20;
+        ctx.font = '8px Courier New';
+        ctx.fillStyle = '#333';
+        ctx.textAlign = 'left';
+        ctx.fillText('RECENT ACTIONS', 40, histY);
+
+        const maxShow = Math.min(history.length, 20);
+        const startIdx = history.length - maxShow;
+        for (let i = 0; i < maxShow; i++) {
+            const h = history[startIdx + i];
+            const x = 40 + i * 26;
+            ctx.fillStyle = h.action > 0 ? '#00e5ff' : '#ff6b6b';
+            ctx.font = '11px Courier New';
+            ctx.textAlign = 'center';
+            ctx.fillText(h.action > 0 ? '→' : '←', x + 13, histY + 14);
+        }
+    }
+
+    leftBtn.addEventListener('click', () => step(-1));
+    rightBtn.addEventListener('click', () => step(1));
+
+    autoBtn.addEventListener('click', () => {
+        autoWalking = !autoWalking;
+        autoBtn.textContent = autoWalking ? 'STOP' : 'AUTO-WALK';
+        autoBtn.style.borderColor = autoWalking ? '#ff6b6b' : '#00e5ff';
+        autoBtn.style.color = autoWalking ? '#ff6b6b' : '#00e5ff';
+
+        if (autoWalking) {
+            let pattern = 0; // oscillating pattern
+            autoTimer = setInterval(() => {
+                // Simple oscillating walk pattern
+                if (agentPos >= GRID_SIZE - 2) pattern = -1;
+                else if (agentPos <= 1) pattern = 1;
+                else if (Math.random() < 0.15) pattern = -pattern; // occasional reversal
+                if (pattern === 0) pattern = 1;
+                step(pattern);
+            }, 350);
+        } else {
+            clearInterval(autoTimer);
+        }
+    });
+
+    resetBtn.addEventListener('click', () => {
+        if (autoWalking) {
+            autoWalking = false;
+            clearInterval(autoTimer);
+            autoBtn.textContent = 'AUTO-WALK';
+            autoBtn.style.borderColor = '#00e5ff';
+            autoBtn.style.color = '#00e5ff';
+        }
+        resetModel();
+    });
+
+    resetModel();
+})();
+
+// ==========================================
+// 20. CHAIN OF THOUGHT (DeepSeek R1)
 // ==========================================
 (function () {
     const canvas = document.getElementById('cotCanvas');

@@ -380,6 +380,11 @@
             border-color: #fbbf2433;
         }
 
+        .tag-sequence {
+            color: #2dd4bf;
+            border-color: #2dd4bf33;
+        }
+
         /* Footer */
         footer {
             margin-top: 6rem;
