@@ -336,7 +336,180 @@
 })();
 
 // ==========================================
-// 5. THE SYNTHESIS (TRIANGLE)
+// 5. LINEAR REGRESSION (BEST FIT)
+// ==========================================
+(function () {
+    const canvas = document.getElementById('linregCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const fitBtn = document.getElementById('linreg-fit-btn');
+    const resetBtn = document.getElementById('linreg-reset-btn');
+
+    const width = canvas.width, height = canvas.height;
+    const PAD = 50;
+
+    // Data range
+    const DATA_MIN_X = 0, DATA_MAX_X = 10;
+    const DATA_MIN_Y = -2, DATA_MAX_Y = 12;
+
+    let points = [];
+    let trueW = 0, trueB = 0;
+    let w = 0, b = 0;
+    let isFitting = false;
+    let stepCount = 0;
+    let animId = null;
+
+    function generateData() {
+        trueW = 0.6 + Math.random() * 0.8;  // slope between 0.6 and 1.4
+        trueB = 1 + Math.random() * 2;       // intercept between 1 and 3
+        points = [];
+        const N = 20;
+        for (let i = 0; i < N; i++) {
+            const x = DATA_MIN_X + 0.5 + Math.random() * (DATA_MAX_X - 1);
+            const noise = (Math.random() - 0.5) * 3;
+            const y = trueW * x + trueB + noise;
+            points.push({ x, y });
+        }
+        // Random initial line
+        w = (Math.random() - 0.5) * 2;
+        b = Math.random() * 4;
+        stepCount = 0;
+    }
+    generateData();
+
+    function mapX(x) { return PAD + ((x - DATA_MIN_X) / (DATA_MAX_X - DATA_MIN_X)) * (width - PAD * 2); }
+    function mapY(y) { return (height - PAD) - ((y - DATA_MIN_Y) / (DATA_MAX_Y - DATA_MIN_Y)) * (height - PAD * 2); }
+
+    function getMSE() {
+        let sum = 0;
+        for (const p of points) {
+            const pred = w * p.x + b;
+            sum += (pred - p.y) ** 2;
+        }
+        return sum / points.length;
+    }
+
+    function gradStep() {
+        const lr = 0.004;
+        let dw = 0, db = 0;
+        for (const p of points) {
+            const err = (w * p.x + b) - p.y;
+            dw += 2 * err * p.x;
+            db += 2 * err;
+        }
+        dw /= points.length;
+        db /= points.length;
+        w -= lr * dw;
+        b -= lr * db;
+        stepCount++;
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, width, height);
+
+        // Grid
+        ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 1;
+        for (let x = 0; x <= 10; x += 2) {
+            const px = mapX(x);
+            ctx.beginPath(); ctx.moveTo(px, PAD); ctx.lineTo(px, height - PAD); ctx.stroke();
+        }
+        for (let y = 0; y <= 10; y += 2) {
+            const py = mapY(y);
+            ctx.beginPath(); ctx.moveTo(PAD, py); ctx.lineTo(width - PAD, py); ctx.stroke();
+        }
+
+        // Axes
+        ctx.strokeStyle = '#333'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(PAD, height - PAD); ctx.lineTo(width - PAD, height - PAD); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(PAD, height - PAD); ctx.lineTo(PAD, PAD); ctx.stroke();
+
+        // Axis labels
+        ctx.fillStyle = '#555'; ctx.font = '12px Courier New'; ctx.textAlign = 'center';
+        ctx.fillText('Hours Studied →', width / 2, height - 10);
+        ctx.save();
+        ctx.translate(14, height / 2);
+        ctx.rotate(-Math.PI / 2);
+        ctx.fillText('↑ Exam Score', 0, 0);
+        ctx.restore();
+
+        // Residual lines (dashed pink)
+        const mse = getMSE();
+        for (const p of points) {
+            const pred = w * p.x + b;
+            const px = mapX(p.x);
+            const pyActual = mapY(p.y);
+            const pyPred = mapY(pred);
+            const errMag = Math.min(1, Math.abs(pred - p.y) / 5);
+            ctx.strokeStyle = `rgba(255, 0, 85, ${0.2 + errMag * 0.6})`;
+            ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+            ctx.beginPath(); ctx.moveTo(px, pyActual); ctx.lineTo(px, pyPred); ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        // Fitted line
+        const yLeft = w * DATA_MIN_X + b;
+        const yRight = w * DATA_MAX_X + b;
+        ctx.strokeStyle = '#00e5ff'; ctx.lineWidth = 2.5;
+        ctx.shadowBlur = 8; ctx.shadowColor = '#00e5ff';
+        ctx.beginPath(); ctx.moveTo(mapX(DATA_MIN_X), mapY(yLeft)); ctx.lineTo(mapX(DATA_MAX_X), mapY(yRight)); ctx.stroke();
+        ctx.shadowBlur = 0;
+
+        // Data points
+        for (const p of points) {
+            const px = mapX(p.x), py = mapY(p.y);
+            ctx.beginPath(); ctx.arc(px, py, 5, 0, Math.PI * 2);
+            ctx.fillStyle = '#fff'; ctx.fill();
+            ctx.shadowBlur = 6; ctx.shadowColor = '#fff'; ctx.fill(); ctx.shadowBlur = 0;
+        }
+
+        // HUD: Loss and step count
+        ctx.fillStyle = '#888'; ctx.font = '13px Courier New'; ctx.textAlign = 'right';
+        ctx.fillText(`MSE Loss: ${mse.toFixed(3)}`, width - PAD, PAD - 10);
+        ctx.fillStyle = '#555';
+        ctx.fillText(`Step: ${stepCount}`, width - PAD, PAD + 8);
+
+        // Equation display
+        ctx.fillStyle = '#00e5ff'; ctx.font = 'bold 13px Courier New'; ctx.textAlign = 'left';
+        ctx.fillText(`y = ${w.toFixed(2)}x + ${b.toFixed(2)}`, PAD + 5, PAD - 10);
+    }
+
+    function animFit() {
+        if (!isFitting) return;
+        // Run several steps per frame for snappier convergence
+        for (let i = 0; i < 3; i++) gradStep();
+        draw();
+
+        if (stepCount >= 300 || getMSE() < 0.01) {
+            isFitting = false;
+            fitBtn.innerText = 'FIT LINE';
+            fitBtn.disabled = false;
+            return;
+        }
+        animId = requestAnimationFrame(animFit);
+    }
+
+    fitBtn.addEventListener('click', () => {
+        if (isFitting) return;
+        isFitting = true;
+        fitBtn.disabled = true;
+        fitBtn.innerText = 'FITTING...';
+        animFit();
+    });
+
+    resetBtn.addEventListener('click', () => {
+        if (animId) { cancelAnimationFrame(animId); animId = null; }
+        isFitting = false;
+        fitBtn.innerText = 'FIT LINE';
+        fitBtn.disabled = false;
+        generateData();
+        draw();
+    });
+
+    draw();
+})();
+
+// ==========================================
+// 6. THE SYNTHESIS (TRIANGLE)
 // ==========================================
 (function () {
     const canvas = document.getElementById('archCanvas');

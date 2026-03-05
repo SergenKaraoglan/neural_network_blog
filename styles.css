@@ -307,6 +307,22 @@
             margin: 0;
         }
 
+        .toc ol[start="10"] {
+            counter-reset: toc-counter 9;
+        }
+
+        .toc ol[start="15"] {
+            counter-reset: toc-counter 14;
+        }
+
+        .toc ol[start="18"] {
+            counter-reset: toc-counter 17;
+        }
+
+        .toc ol[start="22"] {
+            counter-reset: toc-counter 21;
+        }
+
         .toc-part {
             font-family: 'Courier New', monospace;
             font-size: 0.75rem;
