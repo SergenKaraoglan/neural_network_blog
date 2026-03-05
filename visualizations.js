@@ -509,7 +509,261 @@
 })();
 
 // ==========================================
-// 6. THE SYNTHESIS (TRIANGLE)
+// 6. SPLITTING THE SPACE (DECISION TREES)
+// ==========================================
+(function () {
+    const canvas = document.getElementById('dtCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const splitBtn = document.getElementById('dt-split-btn');
+    const resetBtn = document.getElementById('dt-reset-btn');
+
+    const W = canvas.width, H = canvas.height;
+    let points = [];
+    let treeRoot = null;
+    let splitsCount = 0;
+
+    function generateData() {
+        points = [];
+        for (let i = 0; i < 250; i++) {
+            let x = Math.random() * W;
+            let y = Math.random() * H;
+
+            // Nested noisy structure: Center blob vs corners, but somewhat chaotic
+            let cx = W / 2, cy = H / 2;
+            let dist = Math.sqrt((x - cx) * (x - cx) + (y - cy) * (y - cy));
+
+            // Base logic
+            let label = dist < 120 ? 1 : 0;
+
+            // Inner-inner hole
+            if (dist < 40) label = 0;
+
+            // Add some noise (10% flip)
+            if (Math.random() < 0.1) label = 1 - label;
+
+            points.push({ x, y, label });
+        }
+    }
+
+    function calcGini(groupA, groupB) {
+        let total = groupA.length + groupB.length;
+        if (total === 0) return 0;
+
+        let gini = 0;
+        for (let group of [groupA, groupB]) {
+            let size = group.length;
+            if (size === 0) continue;
+            let score = 0;
+            let counts = [0, 0];
+            for (let p of group) counts[p.label]++;
+            for (let c of counts) {
+                let p = c / size;
+                score += p * p;
+            }
+            gini += (1.0 - score) * (size / total);
+        }
+        return gini;
+    }
+
+    function findBestSplit(nodePts, xMin, xMax, yMin, yMax) {
+        let bestGini = Infinity;
+        let bestSplit = null;
+
+        let counts = [0, 0];
+        for (let p of nodePts) counts[p.label]++;
+        let nodeClass = counts[1] > counts[0] ? 1 : 0;
+
+        // If pure, no split needed
+        if (counts[0] === 0 || counts[1] === 0 || nodePts.length < 2) {
+            return { leaf: true, classLabel: nodeClass, pts: nodePts, xMin, xMax, yMin, yMax };
+        }
+
+        // Try splitting on X (using random subsets for speed if large, but 250 is small enough)
+        for (let pt of nodePts) {
+            let val = pt.x;
+            if (val <= xMin || val >= xMax) continue;
+            let left = [], right = [];
+            for (let p of nodePts) {
+                if (p.x < val) left.push(p);
+                else right.push(p);
+            }
+            if (left.length === 0 || right.length === 0) continue;
+
+            let gini = calcGini(left, right);
+            if (gini < bestGini) {
+                bestGini = gini;
+                bestSplit = { axis: 'x', val: val, leftPts: left, rightPts: right };
+            }
+        }
+
+        // Try splitting on Y
+        for (let pt of nodePts) {
+            let val = pt.y;
+            if (val <= yMin || val >= yMax) continue;
+            let left = [], right = [];
+            for (let p of nodePts) {
+                if (p.y < val) left.push(p);
+                else right.push(p);
+            }
+            if (left.length === 0 || right.length === 0) continue;
+
+            let gini = calcGini(left, right);
+            if (gini < bestGini) {
+                bestGini = gini;
+                bestSplit = { axis: 'y', val: val, leftPts: left, rightPts: right };
+            }
+        }
+
+        if (!bestSplit) {
+            return { leaf: true, classLabel: nodeClass, pts: nodePts, xMin, xMax, yMin, yMax };
+        }
+
+        return {
+            leaf: false,
+            axis: bestSplit.axis,
+            val: bestSplit.val,
+            leftPts: bestSplit.leftPts,
+            rightPts: bestSplit.rightPts,
+            xMin, xMax, yMin, yMax
+        };
+    }
+
+    function initTree() {
+        treeRoot = { leaf: true, pts: points, xMin: 0, xMax: W, yMin: 0, yMax: H };
+        let c = [0, 0];
+        for (let p of points) c[p.label]++;
+        treeRoot.classLabel = c[1] > c[0] ? 1 : 0;
+        splitsCount = 0;
+        updateUI();
+    }
+
+    // Split all current leaves once
+    function splitLeaves(node) {
+        if (node.leaf) {
+            let c = [0, 0];
+            for (let p of node.pts) c[p.label]++;
+            if (c[0] === 0 || c[1] === 0 || node.pts.length < 2) return false;
+
+            let split = findBestSplit(node.pts, node.xMin, node.xMax, node.yMin, node.yMax);
+            if (split.leaf) return false;
+
+            node.leaf = false;
+            node.axis = split.axis;
+            node.val = split.val;
+
+            let cL = [0, 0], cR = [0, 0];
+            for (let p of split.leftPts) cL[p.label]++;
+            for (let p of split.rightPts) cR[p.label]++;
+
+            node.left = {
+                leaf: true, pts: split.leftPts,
+                classLabel: cL[1] > cL[0] ? 1 : 0,
+                xMin: node.xMin, xMax: node.axis === 'x' ? node.val : node.xMax,
+                yMin: node.yMin, yMax: node.axis === 'y' ? node.val : node.yMax
+            };
+            node.right = {
+                leaf: true, pts: split.rightPts,
+                classLabel: cR[1] > cR[0] ? 1 : 0,
+                xMin: node.axis === 'x' ? node.val : node.xMin, xMax: node.xMax,
+                yMin: node.axis === 'y' ? node.val : node.yMin, yMax: node.yMax
+            };
+            return true;
+        } else {
+            let sL = splitLeaves(node.left);
+            let sR = splitLeaves(node.right);
+            return sL || sR;
+        }
+    }
+
+    function drawNodeLines(node) {
+        if (!node.leaf) {
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            if (node.axis === 'x') {
+                ctx.moveTo(node.val, node.yMin);
+                ctx.lineTo(node.val, node.yMax);
+            } else {
+                ctx.moveTo(node.xMin, node.val);
+                ctx.lineTo(node.xMax, node.val);
+            }
+            ctx.stroke();
+
+            drawNodeLines(node.left);
+            drawNodeLines(node.right);
+        }
+    }
+
+    function drawNodeBackgrounds(node) {
+        if (node.leaf) {
+            ctx.fillStyle = node.classLabel === 1 ? 'rgba(0, 229, 255, 0.15)' : 'rgba(255, 0, 85, 0.15)';
+            ctx.fillRect(node.xMin, node.yMin, node.xMax - node.xMin, node.yMax - node.yMin);
+        } else {
+            drawNodeBackgrounds(node.left);
+            drawNodeBackgrounds(node.right);
+        }
+    }
+
+    function draw() {
+        ctx.fillStyle = '#0f0f0f';
+        ctx.fillRect(0, 0, W, H);
+
+        if (treeRoot) {
+            drawNodeBackgrounds(treeRoot);
+            drawNodeLines(treeRoot);
+        }
+
+        // Draw points
+        for (let p of points) {
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+            ctx.fillStyle = p.label === 1 ? '#00e5ff' : '#ff0055';
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        }
+
+        ctx.font = '14px Courier New';
+        ctx.fillStyle = '#aaa';
+        ctx.textAlign = 'left';
+        ctx.fillText(`TREE DEPTH: ${splitsCount}`, 10, 25);
+    }
+
+    function updateUI() {
+        splitBtn.innerText = `SPLIT ALL LEAVES (+1 DEPTH)`;
+    }
+
+    if (splitBtn) {
+        splitBtn.addEventListener('click', () => {
+            let didSplit = splitLeaves(treeRoot);
+            if (didSplit) {
+                splitsCount++;
+                updateUI();
+                draw();
+            } else {
+                splitBtn.innerText = 'FULLY PURE (MAX SPLITS)';
+            }
+        });
+    }
+
+    if (resetBtn) {
+        resetBtn.addEventListener('click', () => {
+            generateData();
+            initTree();
+            draw();
+            splitBtn.innerText = `SPLIT ALL LEAVES (+1 DEPTH)`;
+        });
+    }
+
+    generateData();
+    initTree();
+    draw();
+})();
+
+// ==========================================
+// 7. THE SYNTHESIS (TRIANGLE)
 // ==========================================
 (function () {
     const canvas = document.getElementById('archCanvas');
