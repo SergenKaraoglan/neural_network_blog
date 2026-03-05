@@ -152,7 +152,116 @@
 })();
 
 // ==========================================
-// 2. THE HINGE (WIRE-FRAME 3D)
+// 2. ADDING NEURONS AND LAYERS (POLYGON)
+// ==========================================
+(function () {
+    const canvas = document.getElementById('layersCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const addBtn = document.getElementById('layers-add-btn');
+    const resetBtn = document.getElementById('layers-reset-btn');
+
+    let neurons = 1;
+
+    function draw() {
+        const W = canvas.width;
+        const H = canvas.height;
+        ctx.fillStyle = '#0f0f0f';
+        ctx.fillRect(0, 0, W, H);
+
+        const cx = W / 2;
+        const cy = H / 2;
+        const R = 80; // inner radius
+
+        ctx.save();
+        ctx.translate(cx, cy);
+
+        // Draw the background shaded regions for the active neurons
+        // We draw them individually with low opacity
+        for (let i = 0; i < neurons; i++) {
+            let angle = (Math.PI * 2 / Math.max(neurons, 3)) * i;
+            if (neurons === 1) angle = -Math.PI / 4;
+            if (neurons === 2) angle = -Math.PI / 4 + i * (Math.PI / 1.5);
+
+            // Distance of the line from center
+            let d = R + 20;
+            if (neurons > 12) d = R + 10;
+
+            ctx.save();
+            ctx.rotate(angle);
+            ctx.fillStyle = 'rgba(0, 229, 255, 0.1)';
+            // draw the half plane
+            ctx.beginPath();
+            ctx.moveTo(-W, -d);
+            ctx.lineTo(W, -d);
+            ctx.lineTo(W, -W);
+            ctx.lineTo(-W, -W);
+            ctx.fill();
+
+            // stroke the boundary line
+            ctx.strokeStyle = '#00e5ff';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(-W, -d);
+            ctx.lineTo(W, -d);
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        ctx.restore();
+
+        // Draw data points (lemons inner, apples outer ring)
+        Math.seedrandom('layers'); // fixed seed to keep dots stable
+        for (let i = 0; i < 150; i++) {
+            let a = Math.random() * Math.PI * 2;
+            let d = Math.random() * R;
+            let x = cx + Math.cos(a) * d * 0.8;
+            let y = cy + Math.sin(a) * d * 0.8;
+            ctx.beginPath();
+            ctx.arc(x, y, 4, 0, Math.PI * 2);
+            ctx.fillStyle = '#00e5ff'; // cyan lemons
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+            ctx.stroke();
+        }
+        for (let i = 0; i < 200; i++) {
+            let a = Math.random() * Math.PI * 2;
+            let d = R + 40 + Math.random() * 80;
+            let x = cx + Math.cos(a) * d;
+            let y = cy + Math.sin(a) * d;
+            ctx.beginPath();
+            ctx.arc(x, y, 4, 0, Math.PI * 2);
+            ctx.fillStyle = '#ff0055'; // pink apples
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+            ctx.stroke();
+        }
+
+        // Draw Neuron count
+        ctx.font = '16px Courier New';
+        ctx.fillStyle = '#aaa';
+        ctx.textAlign = 'left';
+        ctx.fillText(`HIDDEN NEURONS: ${neurons}`, 20, 30);
+    }
+
+    if (addBtn) addBtn.addEventListener('click', () => { neurons++; draw(); });
+    if (resetBtn) resetBtn.addEventListener('click', () => { neurons = 1; draw(); });
+
+    // Ensure Math.seedrandom is available (we just need a simple stable prng if not)
+    if (!Math.seedrandom) {
+        let seed = 1;
+        Math.seedrandom = function (s) { seed = s.length || 1; };
+        Math.random = function () {
+            let x = Math.sin(seed++) * 10000;
+            return x - Math.floor(x);
+        };
+    }
+
+    draw();
+})();
+
+// ==========================================
+// 3. THE HINGE (WIRE-FRAME 3D)
 // ==========================================
 (function () {
     const canvas = document.getElementById('foldCanvas');
