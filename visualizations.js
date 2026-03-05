@@ -3505,7 +3505,282 @@
 })();
 
 // ==========================================
-// 9. RNN WORLD MODEL
+// 10. MARKOV CHAIN
+// ==========================================
+(function () {
+    const canvas = document.getElementById('markovCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const stepBtn = document.getElementById('markov-step-btn');
+    const autoBtn = document.getElementById('markov-auto-btn');
+    const resetBtn = document.getElementById('markov-reset-btn');
+
+    const width = canvas.width, height = canvas.height;
+
+    // States: Sunny, Rainy, Cloudy
+    const STATES = [
+        { label: 'SUNNY', emoji: '☀', color: '#fbbf24', x: 150, y: 100 },
+        { label: 'RAINY', emoji: '🌧', color: '#3b82f6', x: 450, y: 100 },
+        { label: 'CLOUDY', emoji: '☁', color: '#9ca3af', x: 300, y: 280 }
+    ];
+
+    // Transition matrix: P[from][to]
+    const P = [
+        [0.6, 0.1, 0.3],  // Sunny → ...
+        [0.2, 0.5, 0.3],  // Rainy → ...
+        [0.3, 0.3, 0.4]   // Cloudy → ...
+    ];
+
+    let current = 0;
+    let visits = [0, 0, 0];
+    let totalSteps = 0;
+    let autoInterval = null;
+    let history = [0];
+
+    function sampleNext(state) {
+        const r = Math.random();
+        let cum = 0;
+        for (let i = 0; i < P[state].length; i++) {
+            cum += P[state][i];
+            if (r < cum) return i;
+        }
+        return P[state].length - 1;
+    }
+
+    function drawArrow(fromX, fromY, toX, toY, prob, isSelf, stateIdx) {
+        if (prob < 0.01) return;
+        const alpha = 0.3 + prob * 0.7;
+        const lw = 1 + prob * 5;
+
+        if (isSelf) {
+            // Self-loop: draw a small arc above/below the node
+            const loopRadius = 25;
+            const angles = [-Math.PI / 2, -Math.PI / 2, Math.PI / 4]; // different angles for each state
+            const baseAngle = stateIdx === 2 ? Math.PI / 2 : -Math.PI / 2;
+            const loopCX = fromX + Math.cos(baseAngle) * 40;
+            const loopCY = fromY + Math.sin(baseAngle) * 40;
+
+            ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.6})`;
+            ctx.lineWidth = lw;
+            ctx.beginPath();
+            ctx.arc(loopCX, loopCY, loopRadius, 0, Math.PI * 1.7);
+            ctx.stroke();
+
+            // Probability label
+            ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+            ctx.font = '11px Courier New';
+            ctx.textAlign = 'center';
+            ctx.fillText(prob.toFixed(1), loopCX, loopCY + (stateIdx === 2 ? loopRadius + 14 : -loopRadius - 4));
+            return;
+        }
+
+        const nodeRadius = 28;
+        // Calculate direction
+        const dx = toX - fromX, dy = toY - fromY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const ux = dx / dist, uy = dy / dist;
+
+        // Perpendicular offset to prevent overlapping bidirectional arrows
+        const perpX = -uy * 8, perpY = ux * 8;
+
+        const startX = fromX + ux * nodeRadius + perpX;
+        const startY = fromY + uy * nodeRadius + perpY;
+        const endX = toX - ux * (nodeRadius + 8) + perpX;
+        const endY = toY - uy * (nodeRadius + 8) + perpY;
+
+        ctx.strokeStyle = `rgba(0, 229, 255, ${alpha})`;
+        ctx.lineWidth = lw;
+        ctx.beginPath();
+        ctx.moveTo(startX, startY);
+        ctx.lineTo(endX, endY);
+        ctx.stroke();
+
+        // Arrowhead
+        const arrowSize = 6 + prob * 4;
+        const angle = Math.atan2(endY - startY, endX - startX);
+        ctx.fillStyle = `rgba(0, 229, 255, ${alpha})`;
+        ctx.beginPath();
+        ctx.moveTo(endX, endY);
+        ctx.lineTo(endX - Math.cos(angle - 0.4) * arrowSize, endY - Math.sin(angle - 0.4) * arrowSize);
+        ctx.lineTo(endX - Math.cos(angle + 0.4) * arrowSize, endY - Math.sin(angle + 0.4) * arrowSize);
+        ctx.closePath();
+        ctx.fill();
+
+        // Prob label at midpoint
+        const midX = (startX + endX) / 2 + perpX * 0.8;
+        const midY = (startY + endY) / 2 + perpY * 0.8;
+        ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+        ctx.font = '11px Courier New';
+        ctx.textAlign = 'center';
+        ctx.fillText(prob.toFixed(1), midX, midY - 4);
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, width, height);
+
+        // Draw transition arrows
+        for (let from = 0; from < 3; from++) {
+            for (let to = 0; to < 3; to++) {
+                drawArrow(
+                    STATES[from].x, STATES[from].y,
+                    STATES[to].x, STATES[to].y,
+                    P[from][to],
+                    from === to, from
+                );
+            }
+        }
+
+        // Draw state nodes
+        STATES.forEach((s, i) => {
+            const isActive = (i === current);
+            const r = 28;
+
+            // Glow for active state
+            if (isActive) {
+                ctx.beginPath();
+                ctx.arc(s.x, s.y, r + 8, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(${hexToRgb(s.color)}, 0.15)`;
+                ctx.fill();
+                ctx.strokeStyle = s.color;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+
+            // Fill circle
+            ctx.beginPath();
+            ctx.arc(s.x, s.y, r, 0, Math.PI * 2);
+            ctx.fillStyle = isActive ? '#1a1a1a' : '#0f0f0f';
+            ctx.fill();
+            ctx.strokeStyle = isActive ? s.color : '#444';
+            ctx.lineWidth = isActive ? 2.5 : 1.5;
+            ctx.stroke();
+
+            if (isActive) {
+                ctx.shadowBlur = 12;
+                ctx.shadowColor = s.color;
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+            }
+
+            // Emoji
+            ctx.font = '20px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(s.emoji, s.x, s.y - 1);
+
+            // Label below
+            ctx.fillStyle = isActive ? '#fff' : '#888';
+            ctx.font = `${isActive ? 'bold ' : ''}11px Courier New`;
+            ctx.textBaseline = 'top';
+            ctx.fillText(s.label, s.x, s.y + r + 6);
+        });
+
+        // Visit histogram (right side)
+        const histX = 30, histW = width - 60, histY = height - 55, histH = 30;
+        ctx.fillStyle = '#888'; ctx.font = '11px Courier New'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+        ctx.fillText(`Step: ${totalSteps}`, width / 2, histY - 8);
+
+        if (totalSteps > 0) {
+            const barGap = 6;
+            const barW = (histW - barGap * 2) / 3;
+            for (let i = 0; i < 3; i++) {
+                const frac = visits[i] / totalSteps;
+                const bx = histX + i * (barW + barGap);
+                const bh = frac * histH;
+
+                // Bar background
+                ctx.fillStyle = '#1a1a1a';
+                ctx.fillRect(bx, histY, barW, histH);
+
+                // Filled bar
+                ctx.fillStyle = STATES[i].color;
+                ctx.globalAlpha = 0.7;
+                ctx.fillRect(bx, histY + histH - bh, barW, bh);
+                ctx.globalAlpha = 1;
+
+                // Percentage label
+                ctx.fillStyle = '#fff';
+                ctx.font = '10px Courier New';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'bottom';
+                ctx.fillText(`${(frac * 100).toFixed(0)}%`, bx + barW / 2, histY - 1);
+            }
+        }
+
+        // Sequence trail (last few states)
+        const trailLen = Math.min(history.length, 20);
+        if (trailLen > 0) {
+            ctx.font = '12px sans-serif';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            let tx = 20;
+            const ty = histY - 25;
+            ctx.fillStyle = '#555';
+            ctx.font = '10px Courier New';
+            ctx.fillText('TRACE:', tx, ty);
+            tx += 50;
+            const start = Math.max(0, history.length - 15);
+            for (let i = start; i < history.length; i++) {
+                const op = 0.3 + (i - start) / (history.length - start) * 0.7;
+                ctx.globalAlpha = op;
+                ctx.font = '14px sans-serif';
+                ctx.fillText(STATES[history[i]].emoji, tx, ty);
+                tx += 18;
+            }
+            ctx.globalAlpha = 1;
+        }
+    }
+
+    function hexToRgb(hex) {
+        const r = parseInt(hex.slice(1, 3), 16);
+        const g = parseInt(hex.slice(3, 5), 16);
+        const b = parseInt(hex.slice(5, 7), 16);
+        return `${r}, ${g}, ${b}`;
+    }
+
+    function step() {
+        const next = sampleNext(current);
+        current = next;
+        visits[current]++;
+        totalSteps++;
+        history.push(current);
+        draw();
+    }
+
+    stepBtn.addEventListener('click', step);
+
+    autoBtn.addEventListener('click', function () {
+        if (autoInterval) {
+            clearInterval(autoInterval);
+            autoInterval = null;
+            this.innerText = 'AUTO-WALK';
+            this.style.color = '#00e5ff';
+        } else {
+            this.innerText = 'STOP';
+            this.style.color = '#ff0055';
+            autoInterval = setInterval(step, 250);
+        }
+    });
+
+    resetBtn.addEventListener('click', () => {
+        if (autoInterval) {
+            clearInterval(autoInterval);
+            autoInterval = null;
+            autoBtn.innerText = 'AUTO-WALK';
+            autoBtn.style.color = '#00e5ff';
+        }
+        current = 0;
+        visits = [0, 0, 0];
+        totalSteps = 0;
+        history = [0];
+        draw();
+    });
+
+    draw();
+})();
+
+// ==========================================
+// 11. RNN WORLD MODEL
 // ==========================================
 (function () {
     const canvas = document.getElementById('rnnCanvas');

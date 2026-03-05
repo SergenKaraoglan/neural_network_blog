@@ -311,16 +311,16 @@
             counter-reset: toc-counter 9;
         }
 
-        .toc ol[start="15"] {
-            counter-reset: toc-counter 14;
+        .toc ol[start="16"] {
+            counter-reset: toc-counter 15;
         }
 
-        .toc ol[start="18"] {
-            counter-reset: toc-counter 17;
+        .toc ol[start="19"] {
+            counter-reset: toc-counter 18;
         }
 
-        .toc ol[start="22"] {
-            counter-reset: toc-counter 21;
+        .toc ol[start="23"] {
+            counter-reset: toc-counter 22;
         }
 
         .toc-part {
