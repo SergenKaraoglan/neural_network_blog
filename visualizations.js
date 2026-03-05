@@ -2201,7 +2201,335 @@
 })();
 
 // ==========================================
-// 13. DEEP Q-NETWORK — PONG
+// 20. GENETIC ALGORITHMS (RACE CARS)
+// ==========================================
+(function () {
+    const canvas = document.getElementById('gaCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const mutSlider = document.getElementById('ga-mut-slider');
+    const mutVal = document.getElementById('ga-mut-val');
+    const speedBtn = document.getElementById('ga-speed-btn');
+    const resetBtn = document.getElementById('ga-reset-btn');
+
+    const popSize = 100;
+    const lifespan = 300; // frames per generation
+
+    // Track definition (centerline points)
+    const trackPoints = [
+        { x: 50, y: 280 },
+        { x: 180, y: 280 },
+        { x: 250, y: 180 },
+        { x: 200, y: 80 },
+        { x: 350, y: 50 },
+        { x: 500, y: 150 },
+        { x: 480, y: 280 },
+        { x: 560, y: 280 }
+    ];
+    const trackWidth = 50;
+
+    let population = [];
+    let frame = 0;
+    let generation = 1;
+    let speedMult = 1;
+    let isRunning = true;
+    let animationId;
+    let mutationRate = 0.05;
+
+    // Helper: Point to line segment distance and projection
+    function distToSegment(p, v, w) {
+        const l2 = Math.pow(v.x - w.x, 2) + Math.pow(v.y - w.y, 2);
+        if (l2 === 0) return { d: Math.sqrt(Math.pow(p.x - v.x, 2) + Math.pow(p.y - v.y, 2)), t: 0 };
+        let t = ((p.x - v.x) * (w.x - v.x) + (p.y - v.y) * (w.y - v.y)) / l2;
+        t = Math.max(0, Math.min(1, t));
+        const proj = { x: v.x + t * (w.x - v.x), y: v.y + t * (w.y - v.y) };
+        const d = Math.sqrt(Math.pow(p.x - proj.x, 2) + Math.pow(p.y - proj.y, 2));
+        return { d: d, t: t };
+    }
+
+    // A single DNA sequence (array of steering angles)
+    function DNA(genes) {
+        if (genes) {
+            this.genes = genes;
+        } else {
+            this.genes = [];
+            for (let i = 0; i < lifespan; i++) {
+                // Steering force: -1 (left) to 1 (right)
+                this.genes.push((Math.random() * 2 - 1) * 0.15);
+            }
+        }
+
+        this.crossover = function (partner) {
+            let newGenes = [];
+            let mid = Math.floor(Math.random() * this.genes.length);
+            for (let i = 0; i < this.genes.length; i++) {
+                if (i > mid) newGenes[i] = this.genes[i];
+                else newGenes[i] = partner.genes[i];
+            }
+            return new DNA(newGenes);
+        };
+
+        this.mutate = function (rate) {
+            for (let i = 0; i < this.genes.length; i++) {
+                if (Math.random() < rate) {
+                    // Small random change rather than full replacement often works better for driving
+                    this.genes[i] += (Math.random() * 2 - 1) * 0.1;
+                    this.genes[i] = Math.max(-0.2, Math.min(0.2, this.genes[i]));
+                }
+            }
+        };
+    }
+
+    // A single Race Car
+    function Car(dna) {
+        this.pos = { x: trackPoints[0].x, y: trackPoints[0].y };
+        this.heading = 0; // Pointing right
+        this.speed = 3.5;
+        this.dna = dna || new DNA();
+        this.fitness = 0;
+        this.isDead = false;
+        this.hasCompleted = false;
+        this.currentSegment = 0;
+
+        this.update = function () {
+            if (this.isDead || this.hasCompleted) return;
+
+            // Apply steering from DNA
+            const steer = this.dna.genes[frame] || 0;
+            this.heading += steer;
+
+            // Move forward
+            this.pos.x += Math.cos(this.heading) * this.speed;
+            this.pos.y += Math.sin(this.heading) * this.speed;
+
+            // Check collision and progress
+            let minDistToTrack = Infinity;
+            let bestSegment = this.currentSegment;
+            let bestT = 0;
+
+            // Optimization: Only check current and next segment
+            for (let i = this.currentSegment; i <= Math.min(this.currentSegment + 1, trackPoints.length - 2); i++) {
+                const v = trackPoints[i];
+                const w = trackPoints[i + 1];
+                const res = distToSegment(this.pos, v, w);
+
+                if (res.d < minDistToTrack) {
+                    minDistToTrack = res.d;
+                    bestSegment = i;
+                    bestT = res.t;
+                }
+            }
+
+            // Update progress
+            if (bestSegment >= this.currentSegment) {
+                this.currentSegment = bestSegment;
+            }
+
+            // Did it hit the grass/wall?
+            if (minDistToTrack > trackWidth / 2) {
+                this.isDead = true;
+            }
+
+            // Did it finish?
+            if (this.currentSegment === trackPoints.length - 2 && bestT > 0.95) {
+                this.hasCompleted = true;
+            }
+
+            // Calculate real-time fitness mapping
+            this.fitness = this.currentSegment * 100 + bestT * 100;
+        };
+
+        this.draw = function (ctx) {
+            ctx.save();
+            ctx.translate(this.pos.x, this.pos.y);
+            ctx.rotate(this.heading);
+
+            // Draw car body
+            ctx.fillStyle = this.hasCompleted ? '#00ff88' : (this.isDead ? '#ff0055' : 'rgba(0, 229, 255, 0.6)');
+            ctx.fillRect(-6, -3, 12, 6);
+
+            ctx.restore();
+
+            if (this.hasCompleted) {
+                ctx.beginPath();
+                ctx.arc(this.pos.x, this.pos.y, 8, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(0, 255, 136, 0.4)';
+                ctx.fill();
+            }
+        };
+    }
+
+    function initPop() {
+        population = [];
+        for (let i = 0; i < popSize; i++) {
+            population.push(new Car());
+        }
+        frame = 0;
+        generation = 1;
+    }
+
+    function evaluateAndNextGen() {
+        let maxFit = 0.001; // Avoid divide by zero
+        // Calc fitness for all
+        for (let i = 0; i < popSize; i++) {
+            // Reward finishing, heavily penalty dying early
+            if (population[i].hasCompleted) {
+                population[i].fitness *= 2;
+            } else if (population[i].isDead) {
+                population[i].fitness *= 0.8;
+            }
+
+            population[i].fitness = Math.pow(population[i].fitness, 2); // Exponential selection
+
+            if (population[i].fitness > maxFit) maxFit = population[i].fitness;
+        }
+
+        // Normalize fitness
+        for (let i = 0; i < popSize; i++) {
+            population[i].fitness /= maxFit;
+        }
+
+        // Mating pool
+        let pool = [];
+        for (let i = 0; i < popSize; i++) {
+            let n = Math.floor(population[i].fitness * 100);
+            for (let j = 0; j < n; j++) {
+                pool.push(population[i]);
+            }
+        }
+
+        // Fallback if pool is empty
+        if (pool.length === 0) pool = population;
+
+        // Next generation
+        let newPop = [];
+        for (let i = 0; i < popSize; i++) {
+            let pA = pool[Math.floor(Math.random() * pool.length)].dna;
+            let pB = pool[Math.floor(Math.random() * pool.length)].dna;
+            let childDNA = pA.crossover(pB);
+            childDNA.mutate(mutationRate);
+            newPop.push(new Car(childDNA));
+        }
+
+        population = newPop;
+        frame = 0;
+        generation++;
+    }
+
+    function drawSystem() {
+        ctx.fillStyle = '#0f0f0f';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Draw Track Outline (Wall)
+        ctx.beginPath();
+        ctx.moveTo(trackPoints[0].x, trackPoints[0].y);
+        for (let i = 1; i < trackPoints.length; i++) {
+            ctx.lineTo(trackPoints[i].x, trackPoints[i].y);
+        }
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
+        ctx.lineWidth = trackWidth + 4;
+        ctx.strokeStyle = '#333';
+        ctx.stroke();
+
+        // Draw Track Surface
+        ctx.lineWidth = trackWidth;
+        ctx.strokeStyle = '#1a1a1a';
+        ctx.stroke();
+
+        // Draw Start/Finish lines
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = '#00e5ff'; // Start line
+        ctx.beginPath();
+        ctx.moveTo(trackPoints[0].x, trackPoints[0].y - trackWidth / 2);
+        ctx.lineTo(trackPoints[0].x, trackPoints[0].y + trackWidth / 2);
+        ctx.stroke();
+
+        ctx.strokeStyle = '#00ff88'; // Finish line
+        ctx.beginPath();
+        ctx.moveTo(trackPoints[trackPoints.length - 1].x, trackPoints[trackPoints.length - 1].y - trackWidth / 2);
+        ctx.lineTo(trackPoints[trackPoints.length - 1].x, trackPoints[trackPoints.length - 1].y + trackWidth / 2);
+        ctx.stroke();
+
+        // Draw UI
+        ctx.fillStyle = '#aaa';
+        ctx.font = '14px Courier New';
+        ctx.fillText(`GEN: ${generation}`, 10, 20);
+        ctx.fillText(`FRAME: ${frame}/${lifespan}`, 10, 40);
+
+        // Update and draw agents
+        // Draw dead ones first so they stay in background
+        for (let i = 0; i < popSize; i++) {
+            if (population[i].isDead) population[i].draw(ctx);
+        }
+        for (let i = 0; i < popSize; i++) {
+            population[i].update();
+            if (!population[i].isDead) population[i].draw(ctx);
+        }
+    }
+
+    function loop() {
+        if (!isRunning) return;
+
+        // Handle speed multiplier
+        for (let s = 0; s < speedMult; s++) {
+            drawSystem();
+            frame++;
+
+            // Check if all are dead/finished early
+            let allDone = true;
+            for (let i = 0; i < popSize; i++) {
+                if (!population[i].isDead && !population[i].hasCompleted) {
+                    allDone = false; break;
+                }
+            }
+
+            if (frame >= lifespan || allDone) {
+                evaluateAndNextGen();
+            }
+        }
+
+        animationId = requestAnimationFrame(loop);
+    }
+
+    // Controls
+    if (mutSlider) {
+        mutSlider.addEventListener('input', (e) => {
+            const valStr = parseFloat(e.target.value).toFixed(1);
+            if (mutVal) mutVal.innerText = valStr + "%";
+            mutationRate = parseFloat(e.target.value) / 100;
+        });
+    }
+
+    if (speedBtn) {
+        speedBtn.addEventListener('click', () => {
+            if (speedMult === 1) {
+                speedMult = 5;
+                speedBtn.innerText = "SPEED: 5X";
+                speedBtn.style.color = '#00e5ff';
+                speedBtn.style.borderColor = '#00e5ff';
+            } else {
+                speedMult = 1;
+                speedBtn.innerText = "SPEED: 1X";
+                speedBtn.style.color = '#fff';
+                speedBtn.style.borderColor = 'transparent';
+            }
+        });
+    }
+
+    if (resetBtn) {
+        resetBtn.addEventListener('click', () => {
+            initPop();
+        });
+    }
+
+    // Start
+    initPop();
+    loop();
+})();
+
+// ==========================================
+// 21. DEEP Q-NETWORK — PONG
 // ==========================================
 (function () {
     const canvas = document.getElementById('dqnCanvas');

@@ -77,13 +77,14 @@
         <p class="toc-part">Part IV — Reinforcement Learning</p>
         <ol start="19">
             <li><a href="#sec-rl">Learning by Doing</a></li>
+            <li><a href="#sec-ga">Survival of the Fittest (Genetic Algorithms)</a></li>
             <li><a href="#sec-dqn">The Neural Strategist (Deep Q-Learning)</a></li>
             <li><a href="#sec-mcts">Mastering Games (AlphaZero &amp; MCTS)</a></li>
             <li><a href="#sec-cot">Thinking Out Loud (Chain of Thought)</a></li>
         </ol>
 
         <p class="toc-part">Closing</p>
-        <ol start="23">
+        <ol start="24">
             <li><a href="#sec-illusion">The Illusion of Intelligence</a></li>
             <li><a href="#sec-quiz">Test Your Understanding</a></li>
         </ol>
@@ -785,8 +786,44 @@
         combined with deep neural networks (Deep RL), the Q-Table is replaced by a neural network that can generalize
         across millions of possible states—turning brute-force memorization into genuine strategic reasoning.</p>
 
+    <span class="section-tag tag-reasoning">REASONING</span>
+    <h2 id="sec-ga">20. Survival of the Fittest (Genetic Algorithms)</h2>
+    <p>While gradient descent is powerful, it requires knowing the derivative of our error—the "slope of the hill." But
+        what if the landscape is so rugged, or the rules so complex, that we can't easily calculate a gradient? What if
+        we are training a robot to walk, and there is no simple mathematical equation linking a twitch of a motor to the
+        distance traveled?</p>
+
+    <p>In these cases, we can borrow a strategy from nature: <strong>Darwinian evolution</strong>. A Genetic Algorithm
+        (GA) doesn't calculate gradients; it uses random mutation and natural selection to blindly search for solutions.
+        We create a <em>population</em> of random agents. We let them try to solve the problem, and we score them based
+        on their <em>fitness</em> (e.g., how close they got to the goal). We keep the best performers, let them "breed"
+        by mixing their "DNA" (their parameters), add a little random mutation, and repeat the process for the next
+        generation.</p>
+
+    <div class="interactive-container" style="min-height: 480px; padding-bottom: 2rem;">
+        <canvas id="gaCanvas" width="600" height="340"></canvas>
+        <div class="controls">
+            <div class="slider-group">
+                <label>MUTATION RATE: <span id="ga-mut-val">1%</span></label>
+                <input type="range" id="ga-mut-slider" min="0" max="10" step="0.1" value="1" style="width: 150px;">
+            </div>
+            <button id="ga-speed-btn">SPEED: 1X</button>
+            <button id="ga-reset-btn" style="background:#333; color:#fff;">RESET</button>
+        </div>
+        <p
+            style="font-size: 0.9rem; color: #888; text-align: center; margin-top: 1rem; font-family: 'Courier New', monospace;">
+            Watch a population of race cars evolve to drive around the track without crashing into the walls. Fitness is
+            based on how far they get. Adjust mutation rate to see how it affects learning.
+        </p>
+    </div>
+
+    <p>Because genetic algorithms don't rely on gradients, they are incredibly robust. They can optimize neural networks
+        (a subfield called <strong>Neuroevolution</strong>) or completely different types of code. However, they are
+        often much slower and less sample-efficient than gradient descent when a gradient is available. They trade
+        mathematical elegance for brute-force adaptability.</p>
+
     <span class="section-tag tag-advanced">ADVANCED</span>
-    <h2 id="sec-dqn">20. The Neural Strategist (Deep Q-Learning)</h2>
+    <h2 id="sec-dqn">21. The Neural Strategist (Deep Q-Learning)</h2>
     <p>Our Q-Table from the previous section works beautifully for a small grid. But what happens when the
         state space explodes? A game of Atari has billions of possible screen configurations. A Go board has more
         legal positions than atoms in the universe. No table could ever hold all of those entries.</p>
@@ -828,7 +865,7 @@
     </p>
 
     <span class="section-tag tag-advanced">ADVANCED</span>
-    <h2 id="sec-mcts">21. Mastering Games (AlphaZero & MCTS)</h2>
+    <h2 id="sec-mcts">22. Mastering Games (AlphaZero & MCTS)</h2>
     <p>Deep Q-Networks learn to play games by trial and error, but there's a fundamentally different approach:
         <strong>planning ahead</strong>. When a chess grandmaster considers a move, they don't just react to the
         current board—they simulate future sequences of play, evaluating which paths lead to victory. This is
@@ -866,7 +903,7 @@
         All from pure self-play, guided by search and a neural network working in concert.</p>
 
     <span class="section-tag tag-reasoning">REASONING</span>
-    <h2 id="sec-cot">22. Thinking Out Loud (Chain of Thought)</h2>
+    <h2 id="sec-cot">23. Thinking Out Loud (Chain of Thought)</h2>
     <p>Every technique we have built so far—self-supervised pre-training, attention, MCTS—produces
         models that answer <em>instantly</em>. One forward pass, one prediction. For simple questions
         this works beautifully. But ask a model to solve a hard math problem like <span class="equation">17 × 24</span>,
@@ -922,7 +959,7 @@
     </p>
 
     <span class="section-tag">PHILOSOPHY</span>
-    <h2 id="sec-illusion">23. The Illusion of Intelligence</h2>
+    <h2 id="sec-illusion">24. The Illusion of Intelligence</h2>
     <p>What is a Neural Network, truly? We have seen that it is not a brain. It does not "think." It is purely a
         parametric mathematical function. It is nothing more than a series of matrix multiplications interspersed with
         simple, non-linear hinges.</p>
@@ -969,7 +1006,7 @@ W2 = np.random.randn(3, 1)
     <p>It looks entirely alien compared to the pulsing brains of science fiction. It is just arrays of numbers,
         multiplied and selectively zeroed out, slowly falling down a mathematical valley.</p>
 
-    <h2 id="sec-quiz">24. Test Your Understanding</h2>
+    <h2 id="sec-quiz">25. Test Your Understanding</h2>
     <p>To truly understand it from first principles, you must build it yourself. Below is a live Python environment.
         Write the code for each core component we discussed. You can use <code>print()</code> to debug your logic—the
         output will appear in the console below.</p>
