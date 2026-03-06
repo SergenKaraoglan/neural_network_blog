@@ -824,6 +824,381 @@
 })();
 
 // ==========================================
+// 10. UNIVERSAL APPROXIMATION (DRAW & LEARN)
+// ==========================================
+(function () {
+    const canvas = document.getElementById('universalCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const learnBtn = document.getElementById('ua-learn-btn');
+    const clearBtn = document.getElementById('ua-clear-btn');
+    const neuronsSlider = document.getElementById('ua-neurons-slider');
+    const neuronsVal = document.getElementById('ua-neurons-val');
+
+    const W = canvas.width, H = canvas.height;
+    const PAD_L = 50, PAD_R = 10, PAD_T = 30, PAD_B = 40;
+    const plotW = W - PAD_L - PAD_R, plotH = H - PAD_T - PAD_B;
+
+    // --- State ---
+    let drawnPoints = []; // [{x: 0-1, y: 0-1}]
+    let isDrawing = false;
+    let isTraining = false;
+    let animId = null;
+    let step = 0;
+    let mse = 0;
+
+    // --- Network ---
+    let numH = 20;
+    let wIn = [], bH = [], wOut = [], bOut = 0;
+
+    function initNetwork() {
+        numH = parseInt(neuronsSlider.value);
+        wIn = []; bH = []; wOut = [];
+        for (let i = 0; i < numH; i++) {
+            wIn[i] = (Math.random() - 0.5) * 4;
+            bH[i] = (Math.random() - 0.5) * 2;
+            wOut[i] = (Math.random() - 0.5) * 2 / Math.sqrt(numH);
+        }
+        bOut = 0;
+        step = 0;
+        mse = 0;
+    }
+    initNetwork();
+
+    function forward(x) {
+        let out = bOut;
+        for (let j = 0; j < numH; j++) {
+            const hPre = wIn[j] * x + bH[j];
+            const hAct = Math.max(0, hPre); // ReLU
+            out += wOut[j] * hAct;
+        }
+        return out;
+    }
+
+    // --- Training ---
+    function trainBatch() {
+        if (drawnPoints.length < 2) return;
+        const lr = 0.002;
+        const N = drawnPoints.length;
+
+        // Multiple passes per frame for speed
+        for (let pass = 0; pass < 5; pass++) {
+            let totalLoss = 0;
+            // Gradients
+            const dWIn = new Float64Array(numH);
+            const dBH = new Float64Array(numH);
+            const dWOut = new Float64Array(numH);
+            let dBOut = 0;
+
+            for (const pt of drawnPoints) {
+                const x = pt.x, yTrue = pt.y;
+                // Forward
+                const hPre = new Float64Array(numH);
+                const hAct = new Float64Array(numH);
+                let yPred = bOut;
+                for (let j = 0; j < numH; j++) {
+                    hPre[j] = wIn[j] * x + bH[j];
+                    hAct[j] = Math.max(0, hPre[j]);
+                    yPred += wOut[j] * hAct[j];
+                }
+
+                const err = yPred - yTrue;
+                totalLoss += err * err;
+
+                // Backprop
+                dBOut += err;
+                for (let j = 0; j < numH; j++) {
+                    dWOut[j] += err * hAct[j];
+                    const dh = err * wOut[j] * (hPre[j] > 0 ? 1 : 0);
+                    dWIn[j] += dh * x;
+                    dBH[j] += dh;
+                }
+            }
+
+            // Update
+            bOut -= lr * dBOut / N;
+            for (let j = 0; j < numH; j++) {
+                wOut[j] -= lr * dWOut[j] / N;
+                wIn[j] -= lr * dWIn[j] / N;
+                bH[j] -= lr * dBH[j] / N;
+            }
+            mse = totalLoss / N;
+        }
+        step += 5;
+    }
+
+    // --- Coordinate transforms ---
+    function toScreen(x, y) {
+        return {
+            sx: PAD_L + x * plotW,
+            sy: PAD_T + (1 - y) * plotH
+        };
+    }
+    function fromScreen(sx, sy) {
+        return {
+            x: (sx - PAD_L) / plotW,
+            y: 1 - (sy - PAD_T) / plotH
+        };
+    }
+
+    // --- Draw ---
+    function draw() {
+        ctx.clearRect(0, 0, W, H);
+
+        // Background
+        ctx.fillStyle = '#0a0a0f';
+        ctx.fillRect(0, 0, W, H);
+
+        // Plot area
+        ctx.fillStyle = 'rgba(255,255,255,0.015)';
+        ctx.fillRect(PAD_L, PAD_T, plotW, plotH);
+        ctx.strokeStyle = '#222';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(PAD_L, PAD_T, plotW, plotH);
+
+        // Grid lines
+        ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+        ctx.lineWidth = 0.5;
+        for (let i = 0; i <= 10; i++) {
+            const { sx, sy } = toScreen(i / 10, 0);
+            ctx.beginPath(); ctx.moveTo(sx, PAD_T); ctx.lineTo(sx, PAD_T + plotH); ctx.stroke();
+            const { sx: sx2, sy: sy2 } = toScreen(0, i / 10);
+            ctx.beginPath(); ctx.moveTo(PAD_L, sy2); ctx.lineTo(PAD_L + plotW, sy2); ctx.stroke();
+        }
+
+        // Axis labels
+        ctx.fillStyle = '#333'; ctx.font = '9px Courier New'; ctx.textAlign = 'center';
+        ctx.fillText('0', PAD_L, PAD_T + plotH + 15);
+        ctx.fillText('1', PAD_L + plotW, PAD_T + plotH + 15);
+        ctx.textAlign = 'right';
+        ctx.fillText('0', PAD_L - 5, PAD_T + plotH + 4);
+        ctx.fillText('1', PAD_L - 5, PAD_T + 4);
+
+        // Draw the user's curve (target)
+        if (drawnPoints.length > 1) {
+            // Filled area under curve with gradient
+            ctx.beginPath();
+            const first = toScreen(drawnPoints[0].x, drawnPoints[0].y);
+            ctx.moveTo(first.sx, PAD_T + plotH);
+            ctx.lineTo(first.sx, first.sy);
+            for (let i = 1; i < drawnPoints.length; i++) {
+                const { sx, sy } = toScreen(drawnPoints[i].x, drawnPoints[i].y);
+                ctx.lineTo(sx, sy);
+            }
+            const last = toScreen(drawnPoints[drawnPoints.length - 1].x, drawnPoints[drawnPoints.length - 1].y);
+            ctx.lineTo(last.sx, PAD_T + plotH);
+            ctx.closePath();
+            const grad = ctx.createLinearGradient(0, PAD_T, 0, PAD_T + plotH);
+            grad.addColorStop(0, 'rgba(0, 229, 255, 0.06)');
+            grad.addColorStop(1, 'rgba(0, 229, 255, 0)');
+            ctx.fillStyle = grad;
+            ctx.fill();
+
+            // Curve line
+            ctx.beginPath();
+            ctx.moveTo(first.sx, first.sy);
+            for (let i = 1; i < drawnPoints.length; i++) {
+                const { sx, sy } = toScreen(drawnPoints[i].x, drawnPoints[i].y);
+                ctx.lineTo(sx, sy);
+            }
+            ctx.strokeStyle = '#00e5ff';
+            ctx.lineWidth = 2;
+            ctx.globalAlpha = 0.5;
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+        }
+
+        // Draw data points as subtle dots
+        for (const pt of drawnPoints) {
+            const { sx, sy } = toScreen(pt.x, pt.y);
+            ctx.beginPath(); ctx.arc(sx, sy, 1.5, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(0, 229, 255, 0.3)'; ctx.fill();
+        }
+
+        // Neural network prediction curve
+        if (step > 0 || isTraining) {
+            ctx.beginPath();
+            let first = true;
+            for (let px = PAD_L; px <= PAD_L + plotW; px += 1) {
+                const x = (px - PAD_L) / plotW;
+                const y = forward(x);
+                const { sx, sy } = toScreen(x, Math.max(0, Math.min(1, y)));
+                if (first) { ctx.moveTo(sx, sy); first = false; }
+                else ctx.lineTo(sx, sy);
+            }
+            // Glow effect
+            ctx.strokeStyle = '#a855f7';
+            ctx.lineWidth = 3;
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = '#a855f7';
+            ctx.stroke();
+            ctx.shadowBlur = 8;
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+
+            // Draw individual neuron contributions (subtle)
+            if (numH <= 30) {
+                for (let j = 0; j < numH; j++) {
+                    ctx.beginPath();
+                    let f = true;
+                    for (let px = PAD_L; px <= PAD_L + plotW; px += 3) {
+                        const x = (px - PAD_L) / plotW;
+                        const hPre = wIn[j] * x + bH[j];
+                        const contribution = wOut[j] * Math.max(0, hPre);
+                        const y = Math.max(0, Math.min(1, contribution + 0.5));
+                        const { sx, sy } = toScreen(x, y);
+                        if (f) { ctx.moveTo(sx, sy); f = false; }
+                        else ctx.lineTo(sx, sy);
+                    }
+                    ctx.strokeStyle = `hsla(${(j / numH) * 360}, 80%, 60%, 0.07)`;
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                }
+            }
+        }
+
+        // HUD
+        ctx.fillStyle = '#555'; ctx.font = '11px Courier New'; ctx.textAlign = 'left';
+        if (drawnPoints.length < 2 && !isTraining) {
+            ctx.fillStyle = 'rgba(0, 229, 255, 0.5)';
+            ctx.font = '14px Courier New'; ctx.textAlign = 'center';
+            ctx.fillText('✏️  DRAW A CURVE WITH YOUR MOUSE', W / 2, H / 2 - 10);
+            ctx.font = '11px Courier New';
+            ctx.fillText('Any shape — waves, zigzags, spikes, anything', W / 2, H / 2 + 15);
+        }
+
+        // Stats
+        ctx.fillStyle = '#444'; ctx.font = '10px Courier New'; ctx.textAlign = 'left';
+        ctx.fillText(`NEURONS: ${numH}`, PAD_L + 5, PAD_T + 14);
+        if (step > 0) {
+            ctx.fillText(`STEP: ${step}`, PAD_L + 100, PAD_T + 14);
+            const lossColor = mse < 0.001 ? '#00ff88' : mse < 0.01 ? '#a855f7' : '#ff0055';
+            ctx.fillStyle = lossColor;
+            ctx.fillText(`MSE: ${mse.toFixed(6)}`, PAD_L + 185, PAD_T + 14);
+        }
+
+        // Legend
+        ctx.textAlign = 'right';
+        ctx.fillStyle = '#00e5ff'; ctx.fillText('━ YOUR CURVE', W - PAD_R - 5, PAD_T + 14);
+        if (step > 0) {
+            ctx.fillStyle = '#a855f7'; ctx.fillText('━ NETWORK', W - PAD_R - 5, PAD_T + 28);
+        }
+    }
+
+    // --- Drawing event handlers ---
+    function getPos(e) {
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        return {
+            sx: (clientX - rect.left) * scaleX,
+            sy: (clientY - rect.top) * scaleY
+        };
+    }
+
+    function startDraw(e) {
+        if (isTraining) return;
+        e.preventDefault();
+        isDrawing = true;
+        const { sx, sy } = getPos(e);
+        const pt = fromScreen(sx, sy);
+        if (pt.x >= 0 && pt.x <= 1 && pt.y >= 0 && pt.y <= 1) {
+            drawnPoints.push({ x: Math.max(0, Math.min(1, pt.x)), y: Math.max(0, Math.min(1, pt.y)) });
+        }
+        draw();
+    }
+
+    function moveDraw(e) {
+        if (!isDrawing || isTraining) return;
+        e.preventDefault();
+        const { sx, sy } = getPos(e);
+        const pt = fromScreen(sx, sy);
+        if (pt.x >= 0 && pt.x <= 1) {
+            drawnPoints.push({ x: Math.max(0, Math.min(1, pt.x)), y: Math.max(0, Math.min(1, pt.y)) });
+        }
+        draw();
+    }
+
+    function endDraw(e) {
+        if (!isDrawing) return;
+        isDrawing = false;
+        // Sort by x and remove duplicates
+        drawnPoints.sort((a, b) => a.x - b.x);
+        // Subsample to ~100 evenly spaced points for smooth training
+        if (drawnPoints.length > 100) {
+            const sampled = [];
+            for (let i = 0; i < 100; i++) {
+                const idx = Math.floor(i * drawnPoints.length / 100);
+                sampled.push(drawnPoints[idx]);
+            }
+            drawnPoints = sampled;
+        }
+        draw();
+    }
+
+    canvas.addEventListener('mousedown', startDraw);
+    canvas.addEventListener('mousemove', moveDraw);
+    canvas.addEventListener('mouseup', endDraw);
+    canvas.addEventListener('mouseleave', endDraw);
+    canvas.addEventListener('touchstart', startDraw, { passive: false });
+    canvas.addEventListener('touchmove', moveDraw, { passive: false });
+    canvas.addEventListener('touchend', endDraw);
+
+    // --- Training loop ---
+    function trainLoop() {
+        trainBatch();
+        draw();
+        if (isTraining && mse > 0.00005) {
+            animId = requestAnimationFrame(trainLoop);
+        } else {
+            isTraining = false;
+            learnBtn.innerText = 'LEARN';
+            learnBtn.style.background = '';
+        }
+    }
+
+    learnBtn.addEventListener('click', () => {
+        if (drawnPoints.length < 5) return;
+        if (isTraining) {
+            isTraining = false;
+            if (animId) cancelAnimationFrame(animId);
+            learnBtn.innerText = 'LEARN';
+            learnBtn.style.background = '';
+            return;
+        }
+        initNetwork();
+        isTraining = true;
+        learnBtn.innerText = 'STOP';
+        learnBtn.style.background = '#ff005533';
+        trainLoop();
+    });
+
+    clearBtn.addEventListener('click', () => {
+        if (isTraining) {
+            isTraining = false;
+            if (animId) cancelAnimationFrame(animId);
+            learnBtn.innerText = 'LEARN';
+            learnBtn.style.background = '';
+        }
+        drawnPoints = [];
+        initNetwork();
+        draw();
+    });
+
+    neuronsSlider.addEventListener('input', () => {
+        neuronsVal.innerText = neuronsSlider.value;
+        if (!isTraining) {
+            initNetwork();
+            if (drawnPoints.length > 0) draw();
+        }
+    });
+
+    draw();
+})();
+
+// ==========================================
 // 6. SPLITTING THE SPACE (DECISION TREES)
 // ==========================================
 (function () {
