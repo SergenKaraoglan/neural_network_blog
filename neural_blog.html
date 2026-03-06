@@ -52,6 +52,7 @@
             <li><a href="#sec-arch">The Architecture</a></li>
             <li><a href="#sec-descent">The Descent</a></li>
             <li><a href="#sec-linreg">The Best Fit (Linear Regression)</a></li>
+            <li><a href="#sec-logreg">Drawing the Line (Logistic Regression)</a></li>
             <li><a href="#sec-dt">Splitting the Space (Decision Trees)</a></li>
             <li><a href="#sec-synthesis">The Synthesis</a></li>
             <li><a href="#sec-backprop">The Calculus of Blame</a></li>
@@ -60,7 +61,7 @@
         </ol>
 
         <p class="toc-part">Part II — Language</p>
-        <ol start="12">
+        <ol start="13">
             <li><a href="#sec-markov">Predicting the Next Step (Markov Chains)</a></li>
             <li><a href="#sec-rnn">Memory and Time (RNNs)</a></li>
             <li><a href="#sec-attention">The Attention Mechanism</a></li>
@@ -70,7 +71,7 @@
         </ol>
 
         <p class="toc-part">Part III — Vision</p>
-        <ol start="18">
+        <ol start="19">
             <li><a href="#sec-cnn">Seeing the World (CNNs)</a></li>
             <li><a href="#sec-genai">Dreaming Machines (GenAI)</a></li>
             <li><a href="#sec-gan">The Art of Forgery (GANs)</a></li>
@@ -79,7 +80,7 @@
         </ol>
 
         <p class="toc-part">Part IV — Reinforcement Learning</p>
-        <ol start="23">
+        <ol start="24">
             <li><a href="#sec-rl">Learning by Doing</a></li>
             <li><a href="#sec-ga">Survival of the Fittest (Genetic Algorithms)</a></li>
             <li><a href="#sec-dqn">The Neural Strategist (Deep Q-Learning)</a></li>
@@ -88,7 +89,7 @@
         </ol>
 
         <p class="toc-part">Closing</p>
-        <ol start="28">
+        <ol start="29">
             <li><a href="#sec-illusion">The Illusion of Intelligence</a></li>
             <li><a href="#sec-quiz">Test Your Understanding</a></li>
         </ol>
@@ -298,8 +299,45 @@
         with two parameters, it fits millions of parameters across thousands of non-linear hinges to approximate any
         function imaginable.</p>
 
+    <span class="section-tag tag-fundamentals">FUNDAMENTALS</span>
+    <h2 id="sec-logreg">7. Drawing the Line (Logistic Regression)</h2>
+    <p>Linear regression fits a straight line to predict continuous values. But what if we need to make a
+        <strong>decision</strong>—apple or lemon, spam or not spam, tumour or healthy? The output should
+        be a probability between 0 and 1, not an unbounded number.
+    </p>
+
+    <p>The trick is beautifully simple: take the familiar linear equation <span class="equation">z = w·x + b</span>
+        and pass it through a <strong>Sigmoid</strong> function: <span class="equation">σ(z) = 1 / (1 +
+            e<sup>-z</sup>)</span>.
+        The sigmoid squashes any number into the range (0, 1), creating an S-shaped curve. Values above 0.5
+        are classified as one class; values below as the other. This is <strong>Logistic Regression</strong>—the
+        simplest classifier in machine learning.</p>
+
+    <p>To train it, we replace Mean Squared Error with <strong>Binary Cross-Entropy</strong>, a loss function
+        specifically designed for probabilities. It penalizes confident wrong predictions much more heavily
+        than uncertain ones. Gradient Descent then adjusts the weight and bias to rotate and shift the
+        decision boundary until it cleanly separates the two classes.</p>
+
+    <div class="interactive-container" style="min-height: 480px; padding-bottom: 2rem;">
+        <canvas id="logregCanvas" width="600" height="350"></canvas>
+        <div class="controls">
+            <button id="logreg-fit-btn">FIT CLASSIFIER</button>
+            <button id="logreg-reset-btn"
+                style="background:#222; color:#00e5ff; border: 1px solid #00e5ff;">RESET</button>
+        </div>
+        <p
+            style="font-size: 0.9rem; color: #888; text-align: center; margin-top: 1rem; font-family: 'Courier New', monospace;">
+            Click "FIT CLASSIFIER" to watch Gradient Descent train the sigmoid. The left plot shows the S-curve
+            fitting the data; the right shows the decision boundary and Binary Cross-Entropy loss.
+        </p>
+    </div>
+
+    <p>Logistic regression is the exact activation function used inside every neuron in a classification
+        network. When we stack many neurons with sigmoids (or similar functions) across layers, we go from
+        drawing a single straight boundary to sculpting arbitrarily complex decision surfaces.</p>
+
     <span class="section-tag tag-beginner">BEGINNER</span>
-    <h2 id="sec-dt">7. Splitting the Space (Decision Trees)</h2>
+    <h2 id="sec-dt">8. Splitting the Space (Decision Trees)</h2>
     <p>We've spent a lot of time talking about drawing lines and curves. Neural networks attempt to fit a continuous
         function across all the data. But what if we tried a completely different strategy? What if we just split the
         space into boxes?</p>
@@ -327,7 +365,7 @@
     </div>
 
     <span class="section-tag tag-intermediate">INTERMEDIATE</span>
-    <h2 id="sec-synthesis">8. The Synthesis</h2>
+    <h2 id="sec-synthesis">9. The Synthesis</h2>
     <p>Now we combine everything: the multi-node graph architecture, the non-linear ReLU hinges, and the automated
         descent.</p>
 
@@ -356,7 +394,7 @@
         it can parse human language.</p>
 
     <span class="section-tag tag-intermediate">INTERMEDIATE</span>
-    <h2 id="sec-backprop">9. The Calculus of Blame (Backpropagation)</h2>
+    <h2 id="sec-backprop">10. The Calculus of Blame (Backpropagation)</h2>
     <p>We know how the hiker takes a step downhill (Gradient Descent), but how does the hiker <em>know</em> the precise
         slope of the hill in a landscape with millions of dimensions?</p>
     <p>The answer is <strong>Backpropagation</strong>, an elegant algorithmic application of the Chain Rule from
@@ -385,7 +423,7 @@
     </div>
 
     <span class="section-tag tag-intermediate">INTERMEDIATE</span>
-    <h2 id="sec-batches">10. Batches, Epochs, and Chaos</h2>
+    <h2 id="sec-batches">11. Batches, Epochs, and Chaos</h2>
     <p>If we update the weights after every single piece of fruit (Stochastic Gradient Descent), the hiker's path down
         the mountain will be chaotic and erratic, bouncing around as it overreacts to the quirks of individual apples
         and lemons.</p>
@@ -414,7 +452,7 @@
         bottoms out in the deepest valley it can find.</p>
 
     <span class="section-tag tag-advanced">ADVANCED</span>
-    <h2 id="sec-overfit">11. The Memorization Problem (Overfitting & Regularization)</h2>
+    <h2 id="sec-overfit">12. The Memorization Problem (Overfitting & Regularization)</h2>
     <p>We've continuously added more power to our network: multi-dimensional hinges, deep layers, and self-attention.
         But power introduces a dangerous new problem. If you give a network millions of parameters to solve a simple
         dataset, it might stop looking for the underlying logical pattern and instead just <em>memorize</em> the
@@ -454,7 +492,7 @@
     </div>
 
     <span class="section-tag tag-sequence">SEQUENCE</span>
-    <h2 id="sec-markov">12. Predicting the Next Step (Markov Chains)</h2>
+    <h2 id="sec-markov">13. Predicting the Next Step (Markov Chains)</h2>
     <p>Before we teach a neural network to understand language, let's look at the simplest mathematical model for
         sequences. Imagine predicting the weather: if it is sunny today, what will it be tomorrow? A
         <strong>Markov Chain</strong> answers this with a single, elegant rule: <em>the future depends only on the
@@ -489,7 +527,7 @@
         paragraphs ago. Neural networks solve this by learning to compress arbitrary history into a hidden state.</p>
 
     <span class="section-tag tag-sequence">SEQUENCE</span>
-    <h2 id="sec-rnn">13. Memory and Time (Recurrent Networks)</h2>
+    <h2 id="sec-rnn">14. Memory and Time (Recurrent Networks)</h2>
     <p>Everything we have built so far — from feed-forward classifiers to Markov Chains — shares a common
         limitation: they have no memory of the past. A Markov Chain looks only at the current state. A feed-forward
         network processes each input in isolation. Neither can tell if "bank" means a river bank or a financial
@@ -531,7 +569,7 @@
     </p>
 
     <span class="section-tag tag-advanced">ADVANCED</span>
-    <h2 id="sec-attention">14. The Attention Mechanism (Transformers & LLMs)</h2>
+    <h2 id="sec-attention">15. The Attention Mechanism (Transformers & LLMs)</h2>
     <p>We have just seen how RNNs solve the sequence problem by maintaining a hidden state—but at the cost of
         vanishing gradients and sequential bottlenecks. In 2017, a paper titled
         <em>"Attention Is All You Need"</em> proposed a radical alternative: throw away the recurrence entirely and
@@ -558,7 +596,7 @@
     </div>
 
     <span class="section-tag tag-advanced">ADVANCED</span>
-    <h2 id="sec-tokenisation">15. Breaking Words Apart (Tokenisation)</h2>
+    <h2 id="sec-tokenisation">16. Breaking Words Apart (Tokenisation)</h2>
     <p>We've just seen how Transformers use attention to understand relationships between words in a sentence. But
         there's a deeper question we've been quietly ignoring: <em>how does the network see "words" in the first
             place?</em> A neural network is a mathematical machine. It cannot read the letter "a." It needs
@@ -602,7 +640,7 @@
         the Transformer. The model never sees raw text; it sees a river of numbers, shaped by this algorithm.</p>
 
     <span class="section-tag tag-advanced">ADVANCED</span>
-    <h2 id="sec-embeddings">16. Words as Coordinates (Embeddings)</h2>
+    <h2 id="sec-embeddings">17. Words as Coordinates (Embeddings)</h2>
     <p>Tokenisation gives us integer IDs, but a raw number like <em>4,271</em> contains no meaning. The network
         cannot tell that <em>"king"</em> (token 4,271) is conceptually closer to <em>"queen"</em> (token 8,903)
         than to <em>"refrigerator"</em> (token 15,440). We need a richer representation.</p>
@@ -642,7 +680,7 @@
         on these coordinates, computing distances and directions to derive meaning.</p>
 
     <span class="section-tag tag-generative">GENERATIVE</span>
-    <h2 id="sec-ssl">17. Teaching Without a Teacher (Self-Supervised Learning)</h2>
+    <h2 id="sec-ssl">18. Teaching Without a Teacher (Self-Supervised Learning)</h2>
     <p>Every technique we have built so far is <strong>supervised learning</strong>: a human must hand-label every
         piece of training data. "This image is a cat." "This fruit is lemon." "This email is spam." For every
         example the network learns from, a human had to sit down and write the answer. This is the bottleneck.
@@ -686,7 +724,7 @@
     </div>
 
     <span class="section-tag tag-advanced">ADVANCED</span>
-    <h2 id="sec-cnn">18. Seeing the World (Convolutional Networks)</h2>
+    <h2 id="sec-cnn">19. Seeing the World (Convolutional Networks)</h2>
     <p>We've talked about classifying fruit based on two numbers: weight and yellowness. But what if our input isn't a
         couple of numbers, but an <em>image</em>—say, a 28x28 grid of pixels? That's 784 numbers. If we passed those 784
         numbers into a standard feed-forward layer with 1,000 neurons, we would need 784,000 weights just for the first
@@ -718,7 +756,7 @@
         edges, then corners, then eyes, then faces.</p>
 
     <span class="section-tag tag-generative">GENERATIVE</span>
-    <h2 id="sec-genai">19. Dreaming Machines (Generative AI)</h2>
+    <h2 id="sec-genai">20. Dreaming Machines (Generative AI)</h2>
     <p>Everything up to this point has been discriminative AI: looking at data and assigning it a boundary or a
         probability. But what happens when we ask the network to generate brand new data? This is Generative AI.</p>
 
@@ -751,7 +789,7 @@
     </div>
 
     <span class="section-tag tag-generative">GENERATIVE</span>
-    <h2 id="sec-gan">20. The Art of Forgery (Generative Adversarial Networks)</h2>
+    <h2 id="sec-gan">21. The Art of Forgery (Generative Adversarial Networks)</h2>
     <p>Diffusion models pull structure from noise. But before diffusion, there was an older, more dramatic idea:
         what if we trained two neural networks to <em>fight each other</em>?</p>
 
@@ -793,7 +831,7 @@
         beautiful ideas in machine learning.</p>
 
     <span class="section-tag tag-generative">GENERATIVE</span>
-    <h2 id="sec-vae">21. Compressing Reality (Variational Autoencoders)</h2>
+    <h2 id="sec-vae">22. Compressing Reality (Variational Autoencoders)</h2>
     <p>GANs generate data through adversarial competition. But there is a completely different generative
         philosophy: what if we learned to <em>compress</em> data into its essence, and then <em>decompress</em>
         it back? This is the idea behind the <strong>Autoencoder</strong>.</p>
@@ -837,7 +875,7 @@
         two points interpolates smoothly between two concepts.</p>
 
     <span class="section-tag tag-generative">GENERATIVE</span>
-    <h2 id="sec-latent">22. The Space Between (Manifolds &amp; Latent Spaces)</h2>
+    <h2 id="sec-latent">23. The Space Between (Manifolds &amp; Latent Spaces)</h2>
     <p>We've talked about how neural networks fold space and generate data, but <em>where</em> does that data come from?
         When a model like Midjourney turns text into an image, it isn't pulling from a database; it's navigating a
         <strong>Latent Space</strong>.
@@ -884,7 +922,7 @@
     </div>
 
     <span class="section-tag tag-advanced">ADVANCED</span>
-    <h2 id="sec-rl">23. Learning by Doing (Reinforcement Learning)</h2>
+    <h2 id="sec-rl">24. Learning by Doing (Reinforcement Learning)</h2>
     <p>Supervised learning needs labels. Self-supervised learning extracts labels from the data itself. But what about
         problems where there <em>is</em> no dataset at all—just an environment you can interact with?</p>
 
@@ -929,7 +967,7 @@
         across millions of possible states—turning brute-force memorization into genuine strategic reasoning.</p>
 
     <span class="section-tag tag-reasoning">REASONING</span>
-    <h2 id="sec-ga">24. Survival of the Fittest (Genetic Algorithms)</h2>
+    <h2 id="sec-ga">25. Survival of the Fittest (Genetic Algorithms)</h2>
     <p>While gradient descent is powerful, it requires knowing the derivative of our error—the "slope of the hill." But
         what if the landscape is so rugged, or the rules so complex, that we can't easily calculate a gradient? What if
         we are training a robot to walk, and there is no simple mathematical equation linking a twitch of a motor to the
@@ -965,7 +1003,7 @@
         mathematical elegance for brute-force adaptability.</p>
 
     <span class="section-tag tag-advanced">ADVANCED</span>
-    <h2 id="sec-dqn">25. The Neural Strategist (Deep Q-Learning)</h2>
+    <h2 id="sec-dqn">26. The Neural Strategist (Deep Q-Learning)</h2>
     <p>Our Q-Table from the previous section works beautifully for a small grid. But what happens when the
         state space explodes? A game of Atari has billions of possible screen configurations. A Go board has more
         legal positions than atoms in the universe. No table could ever hold all of those entries.</p>
@@ -1007,7 +1045,7 @@
     </p>
 
     <span class="section-tag tag-advanced">ADVANCED</span>
-    <h2 id="sec-mcts">26. Mastering Games (AlphaZero & MCTS)</h2>
+    <h2 id="sec-mcts">27. Mastering Games (AlphaZero & MCTS)</h2>
     <p>Deep Q-Networks learn to play games by trial and error, but there's a fundamentally different approach:
         <strong>planning ahead</strong>. When a chess grandmaster considers a move, they don't just react to the
         current board—they simulate future sequences of play, evaluating which paths lead to victory. This is
@@ -1045,7 +1083,7 @@
         All from pure self-play, guided by search and a neural network working in concert.</p>
 
     <span class="section-tag tag-reasoning">REASONING</span>
-    <h2 id="sec-cot">27. Thinking Out Loud (Chain of Thought)</h2>
+    <h2 id="sec-cot">28. Thinking Out Loud (Chain of Thought)</h2>
     <p>Every technique we have built so far—self-supervised pre-training, attention, MCTS—produces
         models that answer <em>instantly</em>. One forward pass, one prediction. For simple questions
         this works beautifully. But ask a model to solve a hard math problem like <span class="equation">17 × 24</span>,
@@ -1101,7 +1139,7 @@
     </p>
 
     <span class="section-tag">PHILOSOPHY</span>
-    <h2 id="sec-illusion">28. The Illusion of Intelligence</h2>
+    <h2 id="sec-illusion">29. The Illusion of Intelligence</h2>
     <p>What is a Neural Network, truly? We have seen that it is not a brain. It does not "think." It is purely a
         parametric mathematical function. It is nothing more than a series of matrix multiplications interspersed with
         simple, non-linear hinges.</p>
@@ -1148,7 +1186,7 @@ W2 = np.random.randn(3, 1)
     <p>It looks entirely alien compared to the pulsing brains of science fiction. It is just arrays of numbers,
         multiplied and selectively zeroed out, slowly falling down a mathematical valley.</p>
 
-    <h2 id="sec-quiz">29. Test Your Understanding</h2>
+    <h2 id="sec-quiz">30. Test Your Understanding</h2>
     <p>To truly understand it from first principles, you must build it yourself. Below is a live Python environment.
         Write the code for each core component we discussed. You can use <code>print()</code> to debug your logic—the
         output will appear in the console below.</p>

@@ -618,6 +618,212 @@
 })();
 
 // ==========================================
+// 7. LOGISTIC REGRESSION (SIGMOID CLASSIFIER)
+// ==========================================
+(function () {
+    const canvas = document.getElementById('logregCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const fitBtn = document.getElementById('logreg-fit-btn');
+    const resetBtn = document.getElementById('logreg-reset-btn');
+
+    const W = canvas.width, H = canvas.height;
+    const SPLIT = W * 0.6; // Left panel width (sigmoid), right panel (loss)
+
+    // Generate 1D binary classification data
+    let data = [];
+    let w = 0, b = 0; // parameters
+    let lossHistory = [];
+    let animId = null;
+    let trainStep = 0;
+
+    function generateData() {
+        data = [];
+        // Class 0 (cyan): x in range [-3, 0]
+        for (let i = 0; i < 15; i++) {
+            data.push({ x: -3 + Math.random() * 3, label: 0 });
+        }
+        // Class 1 (pink): x in range [0, 3]
+        for (let i = 0; i < 15; i++) {
+            data.push({ x: Math.random() * 3, label: 1 });
+        }
+    }
+
+    function sigmoid(z) { return 1 / (1 + Math.exp(-Math.max(-20, Math.min(20, z)))); }
+
+    function predict(x) { return sigmoid(w * x + b); }
+
+    function bce() {
+        let loss = 0;
+        for (const d of data) {
+            const p = Math.max(1e-7, Math.min(1 - 1e-7, predict(d.x)));
+            loss -= d.label * Math.log(p) + (1 - d.label) * Math.log(1 - p);
+        }
+        return loss / data.length;
+    }
+
+    function reset() {
+        if (animId) { cancelAnimationFrame(animId); animId = null; }
+        generateData();
+        w = 0.1;
+        b = 0;
+        lossHistory = [];
+        trainStep = 0;
+        fitBtn.disabled = false;
+        draw();
+    }
+
+    function gradStep() {
+        const lr = 0.15;
+        let dw = 0, db = 0;
+        for (const d of data) {
+            const p = predict(d.x);
+            const err = p - d.label;
+            dw += err * d.x;
+            db += err;
+        }
+        w -= lr * dw / data.length;
+        b -= lr * db / data.length;
+    }
+
+    // --- Drawing ---
+    function toScreenLeft(x, y) {
+        // x: [-4, 4] mapped to [20, SPLIT-20]
+        // y: [0, 1] mapped to [H-30, 30]
+        return {
+            sx: 20 + ((x + 4) / 8) * (SPLIT - 40),
+            sy: H - 30 - y * (H - 60)
+        };
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, W, H);
+
+        // --- Left panel: Sigmoid ---
+        // Background
+        ctx.fillStyle = 'rgba(255,255,255,0.02)';
+        ctx.fillRect(0, 0, SPLIT, H);
+        ctx.strokeStyle = '#222'; ctx.strokeRect(0, 0, SPLIT, H);
+
+        // Grid
+        ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 0.5;
+        // Horizontal at y=0.5
+        const { sy: halfY } = toScreenLeft(0, 0.5);
+        ctx.setLineDash([4, 4]); ctx.beginPath();
+        ctx.moveTo(20, halfY); ctx.lineTo(SPLIT - 20, halfY); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = '#444'; ctx.font = '10px Courier New'; ctx.textAlign = 'right';
+        ctx.fillText('0.5', 18, halfY + 4);
+        ctx.fillText('1.0', 18, 34);
+        ctx.fillText('0.0', 18, H - 26);
+
+        // X axis
+        ctx.strokeStyle = '#333'; ctx.lineWidth = 1;
+        const { sy: axisY } = toScreenLeft(0, 0);
+        ctx.beginPath(); ctx.moveTo(20, axisY); ctx.lineTo(SPLIT - 20, axisY); ctx.stroke();
+
+        // Sigmoid curve
+        ctx.beginPath();
+        for (let px = 20; px <= SPLIT - 20; px++) {
+            const x = ((px - 20) / (SPLIT - 40)) * 8 - 4;
+            const y = predict(x);
+            const { sx, sy } = toScreenLeft(x, y);
+            if (px === 20) ctx.moveTo(sx, sy); else ctx.lineTo(sx, sy);
+        }
+        ctx.strokeStyle = '#a855f7'; ctx.lineWidth = 2.5; ctx.stroke();
+        // Glow
+        ctx.shadowBlur = 10; ctx.shadowColor = '#a855f7';
+        ctx.stroke(); ctx.shadowBlur = 0;
+
+        // Decision boundary vertical line at p=0.5 (where w*x+b=0 → x=-b/w)
+        if (Math.abs(w) > 0.01) {
+            const boundary = -b / w;
+            if (boundary > -4 && boundary < 4) {
+                const { sx } = toScreenLeft(boundary, 0);
+                ctx.setLineDash([6, 4]);
+                ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 1;
+                ctx.beginPath(); ctx.moveTo(sx, 30); ctx.lineTo(sx, H - 30); ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.fillStyle = '#888'; ctx.font = '9px Courier New'; ctx.textAlign = 'center';
+                ctx.fillText('BOUNDARY', sx, 24);
+            }
+        }
+
+        // Data points
+        for (const d of data) {
+            const { sx, sy } = toScreenLeft(d.x, d.label);
+            ctx.beginPath(); ctx.arc(sx, sy, 5, 0, Math.PI * 2);
+            ctx.fillStyle = d.label === 0 ? '#00e5ff' : '#ff0055';
+            ctx.globalAlpha = 0.8; ctx.fill(); ctx.globalAlpha = 1;
+            ctx.strokeStyle = d.label === 0 ? '#00e5ff' : '#ff0055';
+            ctx.lineWidth = 1; ctx.stroke();
+        }
+
+        // Label
+        ctx.fillStyle = '#666'; ctx.font = '11px Courier New'; ctx.textAlign = 'center';
+        ctx.fillText('SIGMOID CURVE', SPLIT / 2, H - 8);
+
+        // --- Right panel: Loss ---
+        const rX = SPLIT + 15, rW = W - SPLIT - 30;
+        ctx.fillStyle = 'rgba(255,255,255,0.02)';
+        ctx.fillRect(SPLIT, 0, W - SPLIT, H);
+        ctx.strokeStyle = '#222'; ctx.strokeRect(SPLIT, 0, W - SPLIT, H);
+
+        ctx.fillStyle = '#666'; ctx.font = '11px Courier New'; ctx.textAlign = 'center';
+        ctx.fillText('BINARY CROSS-ENTROPY', SPLIT + (W - SPLIT) / 2, 14);
+        ctx.fillText(`STEP: ${trainStep}`, SPLIT + (W - SPLIT) / 2, H - 8);
+
+        if (lossHistory.length > 0) {
+            const maxLoss = Math.max(1, ...lossHistory);
+            ctx.beginPath();
+            for (let i = 0; i < lossHistory.length; i++) {
+                const lx = rX + (i / Math.max(1, lossHistory.length - 1)) * rW;
+                const ly = H - 35 - (lossHistory[i] / maxLoss) * (H - 70);
+                if (i === 0) ctx.moveTo(lx, ly); else ctx.lineTo(lx, ly);
+            }
+            ctx.strokeStyle = '#00ff88'; ctx.lineWidth = 2; ctx.stroke();
+            ctx.shadowBlur = 6; ctx.shadowColor = '#00ff88'; ctx.stroke(); ctx.shadowBlur = 0;
+
+            // Current loss value
+            ctx.fillStyle = '#00ff88'; ctx.font = '12px Courier New'; ctx.textAlign = 'left';
+            ctx.fillText(`LOSS: ${lossHistory[lossHistory.length - 1].toFixed(4)}`, rX, 35);
+        }
+
+        // Parameters
+        ctx.fillStyle = '#888'; ctx.font = '10px Courier New'; ctx.textAlign = 'left';
+        ctx.fillText(`w: ${w.toFixed(3)}`, rX, 55);
+        ctx.fillText(`b: ${b.toFixed(3)}`, rX + 70, 55);
+    }
+
+    // --- Training animation ---
+    function trainAnimate() {
+        gradStep();
+        trainStep++;
+        lossHistory.push(bce());
+        draw();
+
+        if (trainStep < 100) {
+            animId = requestAnimationFrame(trainAnimate);
+        } else {
+            animId = null;
+            fitBtn.disabled = false;
+        }
+    }
+
+    fitBtn.addEventListener('click', () => {
+        if (animId) return;
+        fitBtn.disabled = true;
+        lossHistory = [];
+        trainStep = 0;
+        trainAnimate();
+    });
+
+    resetBtn.addEventListener('click', reset);
+
+    reset();
+})();
+
+// ==========================================
 // 6. SPLITTING THE SPACE (DECISION TREES)
 // ==========================================
 (function () {

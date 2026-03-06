@@ -307,20 +307,20 @@
             margin: 0;
         }
 
-        .toc ol[start="12"] {
-            counter-reset: toc-counter 11;
+        .toc ol[start="13"] {
+            counter-reset: toc-counter 12;
         }
 
-        .toc ol[start="18"] {
-            counter-reset: toc-counter 17;
+        .toc ol[start="19"] {
+            counter-reset: toc-counter 18;
         }
 
-        .toc ol[start="23"] {
-            counter-reset: toc-counter 22;
+        .toc ol[start="24"] {
+            counter-reset: toc-counter 23;
         }
 
-        .toc ol[start="28"] {
-            counter-reset: toc-counter 27;
+        .toc ol[start="29"] {
+            counter-reset: toc-counter 28;
         }
 
         .toc-part {
