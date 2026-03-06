@@ -4503,6 +4503,342 @@
 })();
 
 // ==========================================
+// 21. VARIATIONAL AUTOENCODER (VAE)
+// ==========================================
+(function () {
+    const canvas = document.getElementById('vaeCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const trainBtn = document.getElementById('vae-train-btn');
+    const autoBtn = document.getElementById('vae-auto-btn');
+    const sampleBtn = document.getElementById('vae-sample-btn');
+    const resetBtn = document.getElementById('vae-reset-btn');
+
+    const W = canvas.width, H = canvas.height;
+
+    // --- Data: 4 clusters in 2D (like classes of shapes) ---
+    const COLORS = ['#00e5ff', '#ff0055', '#00ff88', '#a855f7'];
+    const CLUSTER_CENTERS = [[-2, -2], [2, -2], [-2, 2], [2, 2]];
+    const CLUSTER_SPREAD = 0.6;
+    const PTS_PER_CLUSTER = 20;
+
+    let dataPoints = [];
+    function generateData() {
+        dataPoints = [];
+        for (let c = 0; c < CLUSTER_CENTERS.length; c++) {
+            for (let i = 0; i < PTS_PER_CLUSTER; i++) {
+                dataPoints.push({
+                    x: CLUSTER_CENTERS[c][0] + (Math.random() - 0.5) * 2 * CLUSTER_SPREAD,
+                    y: CLUSTER_CENTERS[c][1] + (Math.random() - 0.5) * 2 * CLUSTER_SPREAD,
+                    cls: c
+                });
+            }
+        }
+    }
+    generateData();
+
+    // --- Simple VAE: Encoder maps 2D→2D latent (mean+logvar), Decoder maps 2D→2D ---
+    const HLAT = 16;
+
+    function randMat(rows, cols, scale) {
+        const m = [];
+        for (let r = 0; r < rows; r++) {
+            m[r] = [];
+            for (let c = 0; c < cols; c++) m[r][c] = (Math.random() - 0.5) * scale;
+        }
+        return m;
+    }
+    function zeroVec(n) { return new Float64Array(n); }
+
+    let enc, dec;
+    let step = 0;
+    let autoInterval = null;
+    let sampledPoints = [];
+
+    function initNetworks() {
+        const s = 0.5;
+        enc = {
+            w1: randMat(2, HLAT, s), b1: zeroVec(HLAT),
+            wMu: randMat(HLAT, 2, s), bMu: zeroVec(2),
+            wLv: randMat(HLAT, 2, s), bLv: zeroVec(2)
+        };
+        dec = {
+            w1: randMat(2, HLAT, s), b1: zeroVec(HLAT),
+            w2: randMat(HLAT, 2, s), b2: zeroVec(2)
+        };
+        step = 0;
+        sampledPoints = [];
+    }
+    initNetworks();
+
+    function relu(x) { return Math.max(0, x); }
+
+    function encode(x, y) {
+        const h = new Float64Array(HLAT);
+        for (let j = 0; j < HLAT; j++) h[j] = relu(x * enc.w1[0][j] + y * enc.w1[1][j] + enc.b1[j]);
+        const mu = new Float64Array(2), lv = new Float64Array(2);
+        for (let j = 0; j < 2; j++) {
+            let sm = enc.bMu[j], sl = enc.bLv[j];
+            for (let k = 0; k < HLAT; k++) { sm += h[k] * enc.wMu[k][j]; sl += h[k] * enc.wLv[k][j]; }
+            mu[j] = sm; lv[j] = Math.max(-4, Math.min(4, sl));
+        }
+        return { h, mu, lv };
+    }
+
+    function reparameterize(mu, lv) {
+        const z = new Float64Array(2);
+        for (let j = 0; j < 2; j++) {
+            const std = Math.exp(0.5 * lv[j]);
+            z[j] = mu[j] + std * (Math.random() * 2 - 1) * 0.5;
+        }
+        return z;
+    }
+
+    function decode(z) {
+        const h = new Float64Array(HLAT);
+        for (let j = 0; j < HLAT; j++) h[j] = relu(z[0] * dec.w1[0][j] + z[1] * dec.w1[1][j] + dec.b1[j]);
+        const out = new Float64Array(2);
+        for (let j = 0; j < 2; j++) {
+            let s = dec.b2[j];
+            for (let k = 0; k < HLAT; k++) s += h[k] * dec.w2[k][j];
+            out[j] = s;
+        }
+        return { h, out };
+    }
+
+    // --- Training step ---
+    function trainStep() {
+        const lr = 0.0005;
+        const beta = 0.2; // KL weight
+
+        for (const pt of dataPoints) {
+            const { h: hE, mu, lv } = encode(pt.x, pt.y);
+            const z = reparameterize(mu, lv);
+            const { h: hD, out } = decode(z);
+
+            // Reconstruction loss gradients
+            const dOut = [2 * (out[0] - pt.x), 2 * (out[1] - pt.y)];
+
+            // Backprop decoder
+            for (let j = 0; j < 2; j++) {
+                dec.b2[j] -= lr * dOut[j];
+                for (let k = 0; k < HLAT; k++) {
+                    dec.w2[k][j] -= lr * hD[k] * dOut[j];
+                }
+            }
+            for (let k = 0; k < HLAT; k++) {
+                let dh = 0;
+                for (let j = 0; j < 2; j++) dh += dec.w2[k][j] * dOut[j];
+                dh *= (hD[k] > 0 ? 1 : 0);
+                dec.b1[k] -= lr * dh;
+                dec.w1[0][k] -= lr * z[0] * dh;
+                dec.w1[1][k] -= lr * z[1] * dh;
+            }
+
+            // Gradient through z to encoder
+            const dz = new Float64Array(2);
+            for (let j = 0; j < 2; j++) {
+                let d = 0;
+                for (let k = 0; k < HLAT; k++) {
+                    let dh = 0;
+                    for (let jj = 0; jj < 2; jj++) dh += dec.w2[k][jj] * dOut[jj];
+                    dh *= (hD[k] > 0 ? 1 : 0);
+                    d += dec.w1[j][k] * dh;
+                }
+                dz[j] = d;
+            }
+
+            // KL divergence gradient: d/dmu = mu, d/dlv = 0.5*(exp(lv) - 1)
+            const dMu = [dz[0] + beta * mu[0], dz[1] + beta * mu[1]];
+            const dLv = [
+                dz[0] * (z[0] - mu[0]) * 0.5 + beta * 0.5 * (Math.exp(lv[0]) - 1),
+                dz[1] * (z[1] - mu[1]) * 0.5 + beta * 0.5 * (Math.exp(lv[1]) - 1)
+            ];
+
+            // Backprop encoder
+            for (let j = 0; j < 2; j++) {
+                enc.bMu[j] -= lr * dMu[j];
+                enc.bLv[j] -= lr * dLv[j];
+                for (let k = 0; k < HLAT; k++) {
+                    enc.wMu[k][j] -= lr * hE[k] * dMu[j];
+                    enc.wLv[k][j] -= lr * hE[k] * dLv[j];
+                }
+            }
+            for (let k = 0; k < HLAT; k++) {
+                let dh = 0;
+                for (let j = 0; j < 2; j++) {
+                    dh += enc.wMu[k][j] * dMu[j];
+                    dh += enc.wLv[k][j] * dLv[j];
+                }
+                dh *= (hE[k] > 0 ? 1 : 0);
+                enc.b1[k] -= lr * dh;
+                enc.w1[0][k] -= lr * pt.x * dh;
+                enc.w1[1][k] -= lr * pt.y * dh;
+            }
+        }
+        step++;
+    }
+
+    // --- Drawing ---
+    const PANEL_W = W / 3;
+    const PAD = 15;
+    const RANGE = 4;
+
+    function toPanel(px, py, panelIdx) {
+        const ox = panelIdx * PANEL_W;
+        return {
+            sx: ox + PAD + ((px + RANGE) / (2 * RANGE)) * (PANEL_W - 2 * PAD),
+            sy: PAD + 20 + ((RANGE - py) / (2 * RANGE)) * (H - 2 * PAD - 30)
+        };
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, W, H);
+
+        // Panel backgrounds
+        for (let i = 0; i < 3; i++) {
+            ctx.fillStyle = i === 1 ? 'rgba(168, 85, 247, 0.03)' : 'rgba(255,255,255,0.02)';
+            ctx.fillRect(i * PANEL_W + 2, 2, PANEL_W - 4, H - 4);
+            ctx.strokeStyle = '#222';
+            ctx.strokeRect(i * PANEL_W, 0, PANEL_W, H);
+        }
+
+        // Labels
+        ctx.font = '11px Courier New'; ctx.textAlign = 'center';
+        ctx.fillStyle = '#666';
+        ctx.fillText('INPUT DATA', PANEL_W / 2, 14);
+        ctx.fillText('LATENT SPACE (z)', PANEL_W + PANEL_W / 2, 14);
+        ctx.fillText('RECONSTRUCTION', 2 * PANEL_W + PANEL_W / 2, 14);
+
+        ctx.fillStyle = '#444'; ctx.textAlign = 'right';
+        ctx.fillText(`STEP: ${step}`, W - 10, 14);
+
+        // Encode all data points
+        const encoded = dataPoints.map(pt => {
+            const { mu, lv } = encode(pt.x, pt.y);
+            const z = reparameterize(mu, lv);
+            const { out } = decode(z);
+            return { ...pt, mu, lv, z, recon: out };
+        });
+
+        // Panel 0: Input data
+        for (const pt of dataPoints) {
+            const { sx, sy } = toPanel(pt.x, pt.y, 0);
+            ctx.beginPath(); ctx.arc(sx, sy, 4, 0, Math.PI * 2);
+            ctx.fillStyle = COLORS[pt.cls]; ctx.globalAlpha = 0.7; ctx.fill(); ctx.globalAlpha = 1;
+        }
+
+        // Panel 1: Latent space
+        // Draw faint grid
+        ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 0.5;
+        for (let v = -3; v <= 3; v++) {
+            const { sx: sx1, sy: sy1 } = toPanel(v, -RANGE, 1);
+            const { sx: sx2, sy: sy2 } = toPanel(v, RANGE, 1);
+            ctx.beginPath(); ctx.moveTo(sx1, sy1); ctx.lineTo(sx2, sy2); ctx.stroke();
+            const { sx: sx3, sy: sy3 } = toPanel(-RANGE, v, 1);
+            const { sx: sx4, sy: sy4 } = toPanel(RANGE, v, 1);
+            ctx.beginPath(); ctx.moveTo(sx3, sy3); ctx.lineTo(sx4, sy4); ctx.stroke();
+        }
+
+        // Draw encoded points as mu with uncertainty ellipses
+        for (const e of encoded) {
+            const { sx, sy } = toPanel(e.mu[0], e.mu[1], 1);
+            // Uncertainty ellipse (from logvar)
+            const rx = Math.exp(0.5 * e.lv[0]) * (PANEL_W - 2 * PAD) / (2 * RANGE) * 0.5;
+            const ry = Math.exp(0.5 * e.lv[1]) * (H - 2 * PAD - 30) / (2 * RANGE) * 0.5;
+            ctx.beginPath(); ctx.ellipse(sx, sy, Math.min(rx, 30), Math.min(ry, 30), 0, 0, Math.PI * 2);
+            ctx.fillStyle = COLORS[e.cls].replace(')', ', 0.08)').replace('rgb', 'rgba');
+            ctx.fill();
+            ctx.strokeStyle = COLORS[e.cls].replace(')', ', 0.2)').replace('rgb', 'rgba');
+            ctx.lineWidth = 1; ctx.stroke();
+
+            // Point at mean
+            ctx.beginPath(); ctx.arc(sx, sy, 3, 0, Math.PI * 2);
+            ctx.fillStyle = COLORS[e.cls]; ctx.globalAlpha = 0.8; ctx.fill(); ctx.globalAlpha = 1;
+        }
+
+        // Draw sampled points in latent space
+        for (const sp of sampledPoints) {
+            const { sx, sy } = toPanel(sp.z[0], sp.z[1], 1);
+            ctx.beginPath(); ctx.arc(sx, sy, 5, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(168, 85, 247, 0.6)'; ctx.fill();
+            ctx.strokeStyle = '#a855f7'; ctx.lineWidth = 1.5; ctx.stroke();
+        }
+
+        // Panel 2: Reconstructed data
+        for (const e of encoded) {
+            const { sx, sy } = toPanel(e.recon[0], e.recon[1], 2);
+            ctx.beginPath(); ctx.arc(sx, sy, 4, 0, Math.PI * 2);
+            ctx.fillStyle = COLORS[e.cls]; ctx.globalAlpha = 0.7; ctx.fill(); ctx.globalAlpha = 1;
+        }
+
+        // Draw sampled point reconstructions
+        for (const sp of sampledPoints) {
+            const { sx, sy } = toPanel(sp.recon[0], sp.recon[1], 2);
+            ctx.beginPath(); ctx.arc(sx, sy, 6, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(168, 85, 247, 0.5)'; ctx.fill();
+            ctx.strokeStyle = '#a855f7'; ctx.lineWidth = 1.5; ctx.stroke();
+
+            // Draw star marker
+            ctx.beginPath();
+            ctx.moveTo(sx, sy - 3); ctx.lineTo(sx, sy + 3);
+            ctx.moveTo(sx - 3, sy); ctx.lineTo(sx + 3, sy);
+            ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.stroke();
+        }
+
+        // Encoder/Decoder arrows
+        ctx.strokeStyle = '#333'; ctx.lineWidth = 2;
+        // Encoder arrow
+        const ax1 = PANEL_W - 5, ax2 = PANEL_W + 5, ay = H / 2;
+        ctx.beginPath(); ctx.moveTo(ax1, ay); ctx.lineTo(ax2, ay); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(ax2, ay); ctx.lineTo(ax2 - 5, ay - 4); ctx.lineTo(ax2 - 5, ay + 4); ctx.fill();
+        ctx.fillStyle = '#555'; ctx.font = '9px Courier New'; ctx.textAlign = 'center';
+        ctx.fillText('ENC', PANEL_W, ay - 8);
+
+        // Decoder arrow
+        const bx1 = 2 * PANEL_W - 5, bx2 = 2 * PANEL_W + 5;
+        ctx.strokeStyle = '#333'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(bx1, ay); ctx.lineTo(bx2, ay); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(bx2, ay); ctx.lineTo(bx2 - 5, ay - 4); ctx.lineTo(bx2 - 5, ay + 4); ctx.fillStyle = '#333'; ctx.fill();
+        ctx.fillStyle = '#555'; ctx.font = '9px Courier New';
+        ctx.fillText('DEC', 2 * PANEL_W, ay - 8);
+    }
+
+    // --- Controls ---
+    trainBtn.addEventListener('click', () => { trainStep(); draw(); });
+
+    let isAuto = false;
+    autoBtn.addEventListener('click', () => {
+        if (isAuto) {
+            clearInterval(autoInterval); autoInterval = null; isAuto = false;
+            autoBtn.innerText = 'AUTO-TRAIN'; autoBtn.style.background = '#222';
+        } else {
+            isAuto = true; autoBtn.innerText = 'STOP'; autoBtn.style.background = '#ff005533';
+            autoInterval = setInterval(() => { trainStep(); draw(); }, 60);
+        }
+    });
+
+    sampleBtn.addEventListener('click', () => {
+        sampledPoints = [];
+        for (let i = 0; i < 5; i++) {
+            const z = [Math.random() * 4 - 2, Math.random() * 4 - 2];
+            const { out } = decode(z);
+            sampledPoints.push({ z, recon: out });
+        }
+        draw();
+    });
+
+    resetBtn.addEventListener('click', () => {
+        if (autoInterval) { clearInterval(autoInterval); autoInterval = null; isAuto = false; autoBtn.innerText = 'AUTO-TRAIN'; autoBtn.style.background = '#222'; }
+        initNetworks();
+        generateData();
+        draw();
+    });
+
+    draw();
+})();
+
+// ==========================================
 // 13. MANIFOLDS & LATENT SPACES
 // ==========================================
 (function () {
