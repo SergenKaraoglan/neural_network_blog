@@ -6484,3 +6484,369 @@
 
     drawStatic();
 })();
+
+// ==========================================
+// 30. THE SINGULARITY (RECURSIVE SELF-IMPROVEMENT)
+// ==========================================
+(function () {
+    const canvas = document.getElementById('singularityCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const playBtn = document.getElementById('sing-play-btn');
+    const resetBtn = document.getElementById('sing-reset-btn');
+    const rateSlider = document.getElementById('sing-rate-slider');
+    const rateVal = document.getElementById('sing-rate-val');
+
+    const W = canvas.width, H = canvas.height;
+    const PAD_L = 60, PAD_R = 20, PAD_T = 35, PAD_B = 50;
+    const plotW = W - PAD_L - PAD_R, plotH = H - PAD_T - PAD_B;
+
+    let rate = 1.5;
+    let simulating = false;
+    let animId = null;
+    let t = 0; // current time step (0 to maxT)
+    const maxT = 200;
+    let humanPts = [];
+    let aiPts = [];
+    let particles = [];
+    let singularityReached = false;
+    let singularityT = -1;
+    let flashAlpha = 0;
+
+    // Milestones
+    const milestones = [
+        { capLabel: 'LANGUAGE', capThreshold: 0.12, color: '#00e5ff' },
+        { capLabel: 'VISION', capThreshold: 0.22, color: '#00ff88' },
+        { capLabel: 'REASONING', capThreshold: 0.4, color: '#ffd700' },
+        { capLabel: 'SELF-IMPROVEMENT', capThreshold: 0.65, color: '#ff6600' },
+        { capLabel: 'SUPERINTELLIGENCE', capThreshold: 0.92, color: '#ff0055' }
+    ];
+    let reachedMilestones = new Set();
+
+    function humanCapability(time) {
+        // Linear growth
+        return 0.02 + (time / maxT) * 0.55;
+    }
+
+    function aiCapability(time) {
+        // Exponential: starts equal to human, diverges
+        // If rate=1, same as human. rate>1 creates exponential growth
+        const base = 0.02;
+        // Delayed exponential: AI matches human until ~30%, then recurse kicks in
+        const linearPhase = Math.min(time, maxT * 0.25);
+        const linearCap = base + (linearPhase / maxT) * 0.55;
+
+        if (time <= maxT * 0.25) return linearCap;
+
+        // Recursive phase
+        const recursiveSteps = time - maxT * 0.25;
+        const compoundRate = 1 + (rate - 1) * 0.015;
+        const expCap = linearCap * Math.pow(compoundRate, recursiveSteps);
+        return Math.min(expCap, 5.0); // cap for display
+    }
+
+    function toScreen(time, cap) {
+        // time: 0..maxT → PAD_L..PAD_L+plotW
+        // cap: 0..1 → PAD_T+plotH..PAD_T (log scale becomes tricky, let's use custom mapping)
+        const x = PAD_L + (time / maxT) * plotW;
+        // Use a combination for display: linear up to 1, then compress
+        let displayY;
+        if (cap <= 1.0) {
+            displayY = cap;
+        } else {
+            // Logarithmic compression above 1
+            displayY = 1.0 + Math.log2(cap) * 0.15;
+        }
+        displayY = Math.min(displayY, 1.3);
+        const y = PAD_T + plotH * (1 - displayY / 1.3);
+        return { x, y };
+    }
+
+    function addParticle(x, y) {
+        particles.push({
+            x, y,
+            vx: (Math.random() - 0.5) * 2,
+            vy: -Math.random() * 2 - 1,
+            life: 1.0,
+            hue: 260 + Math.random() * 40
+        });
+    }
+
+    function reset() {
+        if (animId) cancelAnimationFrame(animId);
+        animId = null;
+        simulating = false;
+        t = 0;
+        humanPts = [];
+        aiPts = [];
+        particles = [];
+        singularityReached = false;
+        singularityT = -1;
+        flashAlpha = 0;
+        reachedMilestones = new Set();
+        playBtn.innerText = 'SIMULATE';
+        playBtn.disabled = false;
+        draw();
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, W, H);
+
+        // Background
+        ctx.fillStyle = '#0a0a0f';
+        ctx.fillRect(0, 0, W, H);
+
+        // Plot area
+        ctx.fillStyle = 'rgba(255,255,255,0.01)';
+        ctx.fillRect(PAD_L, PAD_T, plotW, plotH);
+        ctx.strokeStyle = '#1a1a1a';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(PAD_L, PAD_T, plotW, plotH);
+
+        // Grid
+        ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+        ctx.lineWidth = 0.5;
+        for (let i = 0; i <= 10; i++) {
+            const x = PAD_L + (i / 10) * plotW;
+            ctx.beginPath(); ctx.moveTo(x, PAD_T); ctx.lineTo(x, PAD_T + plotH); ctx.stroke();
+        }
+        for (let i = 0; i <= 5; i++) {
+            const y = PAD_T + (i / 5) * plotH;
+            ctx.beginPath(); ctx.moveTo(PAD_L, y); ctx.lineTo(PAD_L + plotW, y); ctx.stroke();
+        }
+
+        // Y-axis labels
+        ctx.fillStyle = '#333'; ctx.font = '9px Courier New'; ctx.textAlign = 'right';
+        const yLabels = ['SUPER\u200BINTELLIGENT', '', 'HUMAN-LEVEL', '', 'NARROW AI', ''];
+        for (let i = 0; i < yLabels.length; i++) {
+            const y = PAD_T + (i / (yLabels.length - 1)) * plotH;
+            if (yLabels[i]) ctx.fillText(yLabels[i], PAD_L - 5, y + 3);
+        }
+
+        // Human-level horizontal line
+        const { y: humanLine } = toScreen(0, 1.0);
+        ctx.setLineDash([6, 6]);
+        ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(PAD_L, humanLine);
+        ctx.lineTo(PAD_L + plotW, humanLine);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = '#555'; ctx.font = '9px Courier New'; ctx.textAlign = 'left';
+        ctx.fillText('AGI THRESHOLD', PAD_L + 5, humanLine - 5);
+
+        // X-axis
+        ctx.fillStyle = '#333'; ctx.font = '9px Courier New'; ctx.textAlign = 'center';
+        ctx.fillText('TIME →', PAD_L + plotW / 2, H - 8);
+        ctx.fillText('NOW', PAD_L, H - 25);
+        ctx.fillText('FUTURE', PAD_L + plotW, H - 25);
+
+        // Draw a subtle "recursive phase" region
+        if (t > maxT * 0.25) {
+            const phaseX = PAD_L + 0.25 * plotW;
+            ctx.fillStyle = 'rgba(168, 85, 247, 0.02)';
+            ctx.fillRect(phaseX, PAD_T, PAD_L + plotW - phaseX, plotH);
+            ctx.strokeStyle = 'rgba(168, 85, 247, 0.15)';
+            ctx.setLineDash([4, 4]);
+            ctx.beginPath(); ctx.moveTo(phaseX, PAD_T); ctx.lineTo(phaseX, PAD_T + plotH); ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.fillStyle = 'rgba(168, 85, 247, 0.3)'; ctx.font = '9px Courier New'; ctx.textAlign = 'left';
+            ctx.fillText('RECURSIVE PHASE →', phaseX + 5, PAD_T + 12);
+        }
+
+        // Human curve (cyan, linear)
+        if (humanPts.length > 1) {
+            ctx.beginPath();
+            for (let i = 0; i < humanPts.length; i++) {
+                const { x, y } = humanPts[i];
+                if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+            }
+            ctx.strokeStyle = '#00e5ff';
+            ctx.lineWidth = 2;
+            ctx.globalAlpha = 0.7;
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+        }
+
+        // AI curve (purple, exponential, with glow)
+        if (aiPts.length > 1) {
+            // Glow passes
+            for (let glow = 2; glow >= 0; glow--) {
+                ctx.beginPath();
+                for (let i = 0; i < aiPts.length; i++) {
+                    const { x, y } = aiPts[i];
+                    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+                }
+                ctx.strokeStyle = glow === 0 ? '#a855f7' : `rgba(168, 85, 247, ${0.15 / (glow + 1)})`;
+                ctx.lineWidth = glow === 0 ? 2.5 : 6 + glow * 4;
+                ctx.shadowBlur = glow === 0 ? 0 : 15;
+                ctx.shadowColor = '#a855f7';
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+            }
+        }
+
+        // Milestone markers
+        for (const m of milestones) {
+            if (reachedMilestones.has(m.capLabel)) {
+                // Find the time/position of this milestone
+                const capVal = m.capThreshold;
+                let mTime = -1;
+                for (let tt = 0; tt <= t; tt++) {
+                    if (aiCapability(tt) >= capVal) { mTime = tt; break; }
+                }
+                if (mTime >= 0) {
+                    const { x: mx, y: my } = toScreen(mTime, Math.min(capVal, 1.3));
+                    // Diamond marker
+                    ctx.save();
+                    ctx.translate(mx, my);
+                    ctx.rotate(Math.PI / 4);
+                    ctx.fillStyle = m.color;
+                    ctx.globalAlpha = 0.8;
+                    ctx.fillRect(-4, -4, 8, 8);
+                    ctx.globalAlpha = 1;
+                    ctx.restore();
+                    // Label
+                    ctx.fillStyle = m.color;
+                    ctx.font = 'bold 8px Courier New';
+                    ctx.textAlign = 'left';
+                    ctx.fillText(m.capLabel, mx + 8, my + 3);
+                }
+            }
+        }
+
+        // Particles
+        for (const p of particles) {
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 2, 0, Math.PI * 2);
+            ctx.fillStyle = `hsla(${p.hue}, 80%, 60%, ${p.life * 0.6})`;
+            ctx.fill();
+        }
+
+        // Singularity flash
+        if (flashAlpha > 0) {
+            ctx.fillStyle = `rgba(168, 85, 247, ${flashAlpha * 0.3})`;
+            ctx.fillRect(0, 0, W, H);
+
+            // Vertical line at singularity
+            if (singularityT > 0) {
+                const { x: sx } = toScreen(singularityT, 0);
+                ctx.strokeStyle = `rgba(255, 0, 85, ${flashAlpha})`;
+                ctx.lineWidth = 2;
+                ctx.setLineDash([8, 4]);
+                ctx.beginPath(); ctx.moveTo(sx, PAD_T); ctx.lineTo(sx, PAD_T + plotH); ctx.stroke();
+                ctx.setLineDash([]);
+
+                ctx.fillStyle = `rgba(255, 0, 85, ${flashAlpha})`;
+                ctx.font = 'bold 12px Courier New'; ctx.textAlign = 'center';
+                ctx.fillText('⚠ SINGULARITY HORIZON', sx, PAD_T - 8);
+                ctx.font = '9px Courier New';
+                ctx.fillText('PREDICTION IMPOSSIBLE BEYOND THIS POINT', sx, PAD_T - 20);
+            }
+        }
+
+        // Legend
+        ctx.globalAlpha = 1;
+        ctx.font = '10px Courier New'; ctx.textAlign = 'right';
+        ctx.fillStyle = '#00e5ff';
+        ctx.fillText('━ HUMAN PROGRESS (LINEAR)', W - PAD_R - 5, PAD_T + 14);
+        ctx.fillStyle = '#a855f7';
+        ctx.fillText('━ AI SELF-IMPROVEMENT (EXPONENTIAL)', W - PAD_R - 5, PAD_T + 28);
+
+        // Stats
+        ctx.fillStyle = '#444'; ctx.font = '10px Courier New'; ctx.textAlign = 'left';
+        ctx.fillText(`RATE: ${rate.toFixed(2)}×`, PAD_L + 5, PAD_T + 14);
+        if (t > 0) {
+            ctx.fillText(`CYCLE: ${Math.floor(t)}`, PAD_L + 5, PAD_T + 28);
+            const aiCap = aiCapability(t);
+            const dispCap = aiCap > 10 ? '∞' : aiCap.toFixed(2);
+            ctx.fillStyle = aiCap > 1 ? '#ff0055' : '#a855f7';
+            ctx.fillText(`AI CAPABILITY: ${dispCap}`, PAD_L + 5, PAD_T + 42);
+        }
+    }
+
+    function simulate() {
+        if (t >= maxT) {
+            simulating = false;
+            playBtn.innerText = 'SIMULATE';
+            return;
+        }
+
+        t += 0.7;
+
+        // Build curve arrays
+        const hCap = humanCapability(t);
+        const aCap = aiCapability(t);
+        const hScreen = toScreen(t, Math.min(hCap, 1.3));
+        const aScreen = toScreen(t, Math.min(aCap, 5.0));
+        humanPts.push(hScreen);
+        aiPts.push(aScreen);
+
+        // Check milestones
+        for (const m of milestones) {
+            if (!reachedMilestones.has(m.capLabel) && aCap >= m.capThreshold) {
+                reachedMilestones.add(m.capLabel);
+                // Spawn particles at milestone
+                for (let i = 0; i < 15; i++) addParticle(aScreen.x, aScreen.y);
+            }
+        }
+
+        // Singularity detection
+        if (!singularityReached && aCap >= 1.0) {
+            singularityReached = true;
+            singularityT = t;
+            flashAlpha = 1.0;
+            for (let i = 0; i < 40; i++) addParticle(aScreen.x, aScreen.y);
+        }
+
+        // Add occasional particles on AI curve during recursive phase
+        if (t > maxT * 0.25 && Math.random() < 0.3) {
+            addParticle(aScreen.x, aScreen.y);
+        }
+
+        // Update particles
+        for (let i = particles.length - 1; i >= 0; i--) {
+            const p = particles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.life -= 0.02;
+            if (p.life <= 0) particles.splice(i, 1);
+        }
+
+        // Decay flash
+        if (flashAlpha > 0) flashAlpha = Math.max(0, flashAlpha - 0.008);
+
+        draw();
+
+        if (simulating) {
+            animId = requestAnimationFrame(simulate);
+        }
+    }
+
+    playBtn.addEventListener('click', () => {
+        if (simulating) {
+            simulating = false;
+            if (animId) cancelAnimationFrame(animId);
+            playBtn.innerText = 'SIMULATE';
+            return;
+        }
+        // If finished, reset
+        if (t >= maxT) reset();
+        simulating = true;
+        playBtn.innerText = 'PAUSE';
+        simulate();
+    });
+
+    resetBtn.addEventListener('click', reset);
+
+    rateSlider.addEventListener('input', () => {
+        rate = parseFloat(rateSlider.value);
+        rateVal.innerText = rate.toFixed(2);
+        if (!simulating) {
+            reset();
+        }
+    });
+
+    draw();
+})();

@@ -91,6 +91,7 @@
 
         <p class="toc-part">Closing</p>
         <ol start="30">
+            <li><a href="#sec-singularity">The Recursive Horizon (The Singularity)</a></li>
             <li><a href="#sec-illusion">The Illusion of Intelligence</a></li>
             <li><a href="#sec-quiz">Test Your Understanding</a></li>
         </ol>
@@ -1177,7 +1178,61 @@
     </p>
 
     <span class="section-tag">PHILOSOPHY</span>
-    <h2 id="sec-illusion">30. The Illusion of Intelligence</h2>
+    <h2 id="sec-singularity">30. The Recursive Horizon (The Singularity)</h2>
+    <p>We have just witnessed something unsettling. A model trained with reinforcement learning
+        <em>spontaneously invented self-correction</em> — it learned to doubt itself, to backtrack, to
+        think harder. Nobody told it to do this. The reward signal alone was enough. Now ask yourself: what
+        happens when we turn that same reward signal toward a far more dangerous objective — <strong>making
+            the AI itself better</strong>?
+    </p>
+
+    <p>This is the core argument for the <strong>Technological Singularity</strong>. Imagine an AI capable
+        enough to improve its own architecture, training data, and algorithms. Each improvement makes it
+        <em>more</em> capable of making the <em>next</em> improvement. The first cycle might take a year.
+        The second, a month. The third, a day. The tenth, a millisecond. The curve doesn't just rise — it goes
+        <strong>vertical</strong>. Beyond that point, prediction becomes impossible. Vernor Vinge called this
+        the <em>event horizon of intelligence</em>.
+    </p>
+
+    <p>The simulation below lets you see this in action. Human research improves AI at a steady, linear
+        pace. But the moment AI begins improving <em>itself</em>, the feedback loop ignites. Adjust the
+        self-improvement rate and watch what happens to the curve.</p>
+
+    <div class="interactive-container" style="min-height: 560px; padding-bottom: 2rem;">
+        <canvas id="singularityCanvas" width="700" height="420"></canvas>
+        <div class="controls">
+            <div class="slider-group">
+                <label>SELF-IMPROVEMENT RATE: <span id="sing-rate-val">1.5</span>×</label>
+                <input type="range" id="sing-rate-slider" min="1.05" max="3.0" step="0.05" value="1.5"
+                    style="width: 160px;">
+            </div>
+            <button id="sing-play-btn">SIMULATE</button>
+            <button id="sing-reset-btn"
+                style="background:#222; color:#ff0055; border: 1px solid #ff0055;">RESET</button>
+        </div>
+        <p
+            style="font-size: 0.9rem; color: #888; text-align: center; margin-top: 1rem; font-family: 'Courier New', monospace;">
+            Click SIMULATE to watch both curves evolve. The cyan line is human-driven linear progress.
+            The purple line is recursive AI self-improvement. Adjust the rate to see how quickly the
+            curve goes vertical.
+        </p>
+    </div>
+
+    <p>Notice that it doesn't matter much what the starting rate is. Whether the self-improvement multiplier
+        is 1.1× or 3×, the curve <em>always</em> goes vertical — it just takes more or fewer cycles. This is
+        the nature of exponential growth: it is always deceptive at first, and always overwhelming in the end.
+        The gap between "laughably dumb AI" and "superintelligent AI" may be shockingly thin — perhaps just
+        a handful of recursive self-improvement cycles.</p>
+
+    <p>The singularity is not a certainty. There may be hard limits — fundamental computational barriers,
+        energy constraints, or diminishing returns on architectural improvements. But the mathematical
+        structure is clear: <em>if</em> an AI can improve itself even slightly, and <em>if</em> each
+        improvement compounds, the trajectory is a vertical line. Every technique in this guide — gradient
+        descent, attention, reinforcement learning, chain of thought — is a rung on this ladder. The
+        question is not whether we will build each rung. It is whether the ladder has a ceiling.</p>
+
+    <span class="section-tag">PHILOSOPHY</span>
+    <h2 id="sec-illusion">31. The Illusion of Intelligence</h2>
     <p>What is a Neural Network, truly? We have seen that it is not a brain. It does not "think." It is purely a
         parametric mathematical function. It is nothing more than a series of matrix multiplications interspersed with
         simple, non-linear hinges.</p>
@@ -1224,7 +1279,7 @@ W2 = np.random.randn(3, 1)
     <p>It looks entirely alien compared to the pulsing brains of science fiction. It is just arrays of numbers,
         multiplied and selectively zeroed out, slowly falling down a mathematical valley.</p>
 
-    <h2 id="sec-quiz">31. Test Your Understanding</h2>
+    <h2 id="sec-quiz">32. Test Your Understanding</h2>
     <p>To truly understand it from first principles, you must build it yourself. Below is a live Python environment.
         Write the code for each core component we discussed. You can use <code>print()</code> to debug your logic—the
         output will appear in the console below.</p>
