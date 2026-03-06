@@ -315,12 +315,12 @@
             counter-reset: toc-counter 17;
         }
 
-        .toc ol[start="21"] {
-            counter-reset: toc-counter 20;
+        .toc ol[start="22"] {
+            counter-reset: toc-counter 21;
         }
 
-        .toc ol[start="26"] {
-            counter-reset: toc-counter 25;
+        .toc ol[start="27"] {
+            counter-reset: toc-counter 26;
         }
 
         .toc-part {

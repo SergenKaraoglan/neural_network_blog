@@ -73,11 +73,12 @@
         <ol start="18">
             <li><a href="#sec-cnn">Seeing the World (CNNs)</a></li>
             <li><a href="#sec-genai">Dreaming Machines (GenAI)</a></li>
+            <li><a href="#sec-gan">The Art of Forgery (GANs)</a></li>
             <li><a href="#sec-latent">The Space Between (Manifolds)</a></li>
         </ol>
 
         <p class="toc-part">Part IV — Reinforcement Learning</p>
-        <ol start="21">
+        <ol start="22">
             <li><a href="#sec-rl">Learning by Doing</a></li>
             <li><a href="#sec-ga">Survival of the Fittest (Genetic Algorithms)</a></li>
             <li><a href="#sec-dqn">The Neural Strategist (Deep Q-Learning)</a></li>
@@ -86,7 +87,7 @@
         </ol>
 
         <p class="toc-part">Closing</p>
-        <ol start="26">
+        <ol start="27">
             <li><a href="#sec-illusion">The Illusion of Intelligence</a></li>
             <li><a href="#sec-quiz">Test Your Understanding</a></li>
         </ol>
@@ -720,13 +721,12 @@
     <p>Everything up to this point has been discriminative AI: looking at data and assigning it a boundary or a
         probability. But what happens when we ask the network to generate brand new data? This is Generative AI.</p>
 
-    <p>For a long time, the dominant approach was the <strong>GAN (Generative Adversarial Network)</strong>. Imagine two
-        neural networks locked in a game of cat-and-mouse. The "Generator" network tries to forge a counterfeit painting
-        of a human face out of random static. The "Discriminator" network looks at both real faces and the counterfeits,
-        and tries to spot the fake. As they train against each other, the Generator gets so good at forging data that
-        the resulting images become indistinguishable from reality.</p>
+    <p>One of the earliest and most elegant generative architectures is the <strong>GAN (Generative Adversarial
+            Network)</strong>—two neural networks locked in a game of cat-and-mouse. We will explore GANs in detail
+        in the next section. But first, let's look at the approach that powers today's most spectacular image
+        generators.</p>
 
-    <p>However, recent massive breakthroughs (like DALL-E and Midjourney) use <strong>Diffusion Models</strong>.
+    <p>Recent massive breakthroughs (like DALL-E and Midjourney) use <strong>Diffusion Models</strong>.
         Diffusion works by taking an image of a dog, and slowly adding mathematical static (noise) to it over a thousand
         steps until it looks like pure TV static. The Neural Network is then trained to do one specific job: look at the
         static, and predict the noise that was added at the last step to subtract it. By doing this thousands of times,
@@ -750,7 +750,49 @@
     </div>
 
     <span class="section-tag tag-generative">GENERATIVE</span>
-    <h2 id="sec-latent">20. The Space Between (Manifolds &amp; Latent Spaces)</h2>
+    <h2 id="sec-gan">20. The Art of Forgery (Generative Adversarial Networks)</h2>
+    <p>Diffusion models pull structure from noise. But before diffusion, there was an older, more dramatic idea:
+        what if we trained two neural networks to <em>fight each other</em>?</p>
+
+    <p>A <strong>Generative Adversarial Network (GAN)</strong> is built from two competing networks.
+        The <strong>Generator</strong> takes a vector of random noise and tries to produce data that looks real—a
+        face, a landscape, a handwritten digit. The <strong>Discriminator</strong> receives both real data samples
+        and the Generator's fakes, and tries to tell them apart. The Generator's goal is to fool the Discriminator;
+        the Discriminator's goal is to never be fooled.</p>
+
+    <p>This adversarial game is formalised as a <strong>minimax</strong> objective. The Discriminator wants to
+        maximize its ability to classify real vs. fake, while the Generator wants to minimize the Discriminator's
+        accuracy. Through alternating rounds of gradient descent—first improving D, then improving G—the
+        Generator is forced to produce increasingly realistic data. When training succeeds, the Generator's output
+        becomes indistinguishable from the real distribution, and the Discriminator is reduced to random guessing
+        (D(x) ≈ 0.5 everywhere).</p>
+
+    <div class="interactive-container" style="min-height: 520px; padding-bottom: 2rem;">
+        <canvas id="ganCanvas" width="600" height="380"></canvas>
+        <div class="controls">
+            <button id="gan-step-btn">TRAIN STEP</button>
+            <button id="gan-auto-btn"
+                style="background:#222; color:#00e5ff; border: 1px solid #00e5ff;">AUTO-TRAIN</button>
+            <button id="gan-reset-btn" style="background:#333; color:#fff;">RESET</button>
+        </div>
+        <p
+            style="font-size: 0.9rem; color: #888; text-align: center; margin-top: 1rem; font-family: 'Courier New', monospace;">
+            The Generator (pink) tries to match the real data distribution (cyan). The Discriminator's
+            confidence curve (white dashed) shows where it thinks data is real. Watch the pink distribution
+            converge and the Discriminator flatten to 0.5.
+        </p>
+    </div>
+
+    <p>GANs were behind some of the most jaw-dropping early results in generative AI—photorealistic faces
+        (StyleGAN), image-to-image translation (pix2pix), and super-resolution. However, training them is notoriously
+        difficult. If the Discriminator becomes too strong, the Generator receives no useful gradient signal. If the
+        Generator collapses to producing a single output that fools the Discriminator (called <strong>mode
+            collapse</strong>), it stops exploring the full diversity of real data. Diffusion models have since
+        overtaken GANs for most image generation tasks, but the adversarial principle remains one of the most
+        beautiful ideas in machine learning.</p>
+
+    <span class="section-tag tag-generative">GENERATIVE</span>
+    <h2 id="sec-latent">21. The Space Between (Manifolds &amp; Latent Spaces)</h2>
     <p>We've talked about how neural networks fold space and generate data, but <em>where</em> does that data come from?
         When a model like Midjourney turns text into an image, it isn't pulling from a database; it's navigating a
         <strong>Latent Space</strong>.
@@ -797,7 +839,7 @@
     </div>
 
     <span class="section-tag tag-advanced">ADVANCED</span>
-    <h2 id="sec-rl">21. Learning by Doing (Reinforcement Learning)</h2>
+    <h2 id="sec-rl">22. Learning by Doing (Reinforcement Learning)</h2>
     <p>Supervised learning needs labels. Self-supervised learning extracts labels from the data itself. But what about
         problems where there <em>is</em> no dataset at all—just an environment you can interact with?</p>
 
@@ -842,7 +884,7 @@
         across millions of possible states—turning brute-force memorization into genuine strategic reasoning.</p>
 
     <span class="section-tag tag-reasoning">REASONING</span>
-    <h2 id="sec-ga">22. Survival of the Fittest (Genetic Algorithms)</h2>
+    <h2 id="sec-ga">23. Survival of the Fittest (Genetic Algorithms)</h2>
     <p>While gradient descent is powerful, it requires knowing the derivative of our error—the "slope of the hill." But
         what if the landscape is so rugged, or the rules so complex, that we can't easily calculate a gradient? What if
         we are training a robot to walk, and there is no simple mathematical equation linking a twitch of a motor to the
@@ -878,7 +920,7 @@
         mathematical elegance for brute-force adaptability.</p>
 
     <span class="section-tag tag-advanced">ADVANCED</span>
-    <h2 id="sec-dqn">23. The Neural Strategist (Deep Q-Learning)</h2>
+    <h2 id="sec-dqn">24. The Neural Strategist (Deep Q-Learning)</h2>
     <p>Our Q-Table from the previous section works beautifully for a small grid. But what happens when the
         state space explodes? A game of Atari has billions of possible screen configurations. A Go board has more
         legal positions than atoms in the universe. No table could ever hold all of those entries.</p>
@@ -920,7 +962,7 @@
     </p>
 
     <span class="section-tag tag-advanced">ADVANCED</span>
-    <h2 id="sec-mcts">24. Mastering Games (AlphaZero & MCTS)</h2>
+    <h2 id="sec-mcts">25. Mastering Games (AlphaZero & MCTS)</h2>
     <p>Deep Q-Networks learn to play games by trial and error, but there's a fundamentally different approach:
         <strong>planning ahead</strong>. When a chess grandmaster considers a move, they don't just react to the
         current board—they simulate future sequences of play, evaluating which paths lead to victory. This is
@@ -958,7 +1000,7 @@
         All from pure self-play, guided by search and a neural network working in concert.</p>
 
     <span class="section-tag tag-reasoning">REASONING</span>
-    <h2 id="sec-cot">25. Thinking Out Loud (Chain of Thought)</h2>
+    <h2 id="sec-cot">26. Thinking Out Loud (Chain of Thought)</h2>
     <p>Every technique we have built so far—self-supervised pre-training, attention, MCTS—produces
         models that answer <em>instantly</em>. One forward pass, one prediction. For simple questions
         this works beautifully. But ask a model to solve a hard math problem like <span class="equation">17 × 24</span>,
@@ -1014,7 +1056,7 @@
     </p>
 
     <span class="section-tag">PHILOSOPHY</span>
-    <h2 id="sec-illusion">26. The Illusion of Intelligence</h2>
+    <h2 id="sec-illusion">27. The Illusion of Intelligence</h2>
     <p>What is a Neural Network, truly? We have seen that it is not a brain. It does not "think." It is purely a
         parametric mathematical function. It is nothing more than a series of matrix multiplications interspersed with
         simple, non-linear hinges.</p>
@@ -1061,7 +1103,7 @@ W2 = np.random.randn(3, 1)
     <p>It looks entirely alien compared to the pulsing brains of science fiction. It is just arrays of numbers,
         multiplied and selectively zeroed out, slowly falling down a mathematical valley.</p>
 
-    <h2 id="sec-quiz">27. Test Your Understanding</h2>
+    <h2 id="sec-quiz">28. Test Your Understanding</h2>
     <p>To truly understand it from first principles, you must build it yourself. Below is a live Python environment.
         Write the code for each core component we discussed. You can use <code>print()</code> to debug your logic—the
         output will appear in the console below.</p>

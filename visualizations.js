@@ -4066,6 +4066,443 @@
 })();
 
 // ==========================================
+// 20. GENERATIVE ADVERSARIAL NETWORK (1D GAN)
+// ==========================================
+(function () {
+    const canvas = document.getElementById('ganCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const stepBtn = document.getElementById('gan-step-btn');
+    const autoBtn = document.getElementById('gan-auto-btn');
+    const resetBtn = document.getElementById('gan-reset-btn');
+
+    const W = canvas.width, H = canvas.height;
+    const BINS = 60;
+    const X_MIN = -4, X_MAX = 4;
+    const binW = (X_MAX - X_MIN) / BINS;
+
+    // --- Real data distribution: two Gaussians ---
+    function gaussianPDF(x, mu, sigma) {
+        return Math.exp(-0.5 * ((x - mu) / sigma) ** 2) / (sigma * Math.sqrt(2 * Math.PI));
+    }
+    function realPDF(x) {
+        return 0.5 * gaussianPDF(x, -1.5, 0.5) + 0.5 * gaussianPDF(x, 1.5, 0.5);
+    }
+
+    // Pre-compute real distribution histogram
+    const realHist = new Float64Array(BINS);
+    let realMax = 0;
+    for (let i = 0; i < BINS; i++) {
+        const x = X_MIN + (i + 0.5) * binW;
+        realHist[i] = realPDF(x);
+        if (realHist[i] > realMax) realMax = realHist[i];
+    }
+
+    // --- Simple 1-hidden-layer neural network ---
+    function createNet(inSize, hidSize, outSize) {
+        const he = (n) => Math.sqrt(2 / n);
+        const randW = (rows, cols, scale) => {
+            const m = [];
+            for (let r = 0; r < rows; r++) {
+                m[r] = [];
+                for (let c = 0; c < cols; c++) m[r][c] = (Math.random() - 0.5) * 2 * scale;
+            }
+            return m;
+        };
+        const zeros = (n) => new Float64Array(n);
+        return {
+            w1: randW(inSize, hidSize, he(inSize)),
+            b1: zeros(hidSize),
+            w2: randW(hidSize, outSize, he(hidSize)),
+            b2: zeros(outSize),
+            // For Adam optimizer
+            mw1: randW(inSize, hidSize, 0), vw1: randW(inSize, hidSize, 0),
+            mb1: zeros(hidSize), vb1: zeros(hidSize),
+            mw2: randW(hidSize, outSize, 0), vw2: randW(hidSize, outSize, 0),
+            mb2: zeros(outSize), vb2: zeros(outSize),
+            t: 0
+        };
+    }
+
+    function forward(net, inputs) {
+        // inputs: array of values, each is a 1D input
+        const N = inputs.length;
+        const hidSize = net.b1.length;
+        const outSize = net.b2.length;
+        const hidden = [];
+        const output = [];
+        for (let i = 0; i < N; i++) {
+            const h = new Float64Array(hidSize);
+            for (let j = 0; j < hidSize; j++) {
+                h[j] = Math.max(0, inputs[i] * net.w1[0][j] + net.b1[j]); // ReLU
+            }
+            hidden.push(h);
+            const o = new Float64Array(outSize);
+            for (let j = 0; j < outSize; j++) {
+                let sum = net.b2[j];
+                for (let k = 0; k < hidSize; k++) sum += h[k] * net.w2[k][j];
+                o[j] = sum;
+            }
+            output.push(o);
+        }
+        return { hidden, output };
+    }
+
+    function sigmoid(x) { return 1 / (1 + Math.exp(-Math.max(-20, Math.min(20, x)))); }
+
+    // --- Generator and Discriminator ---
+    const HIDDEN = 32;
+    let G, D;
+    let step = 0;
+    let autoInterval = null;
+
+    function initNetworks() {
+        G = createNet(1, HIDDEN, 1);
+        D = createNet(1, HIDDEN, 1);
+        step = 0;
+    }
+    initNetworks();
+
+    // Sample from real distribution (rejection sampling)
+    function sampleReal(n) {
+        const samples = [];
+        while (samples.length < n) {
+            const x = X_MIN + Math.random() * (X_MAX - X_MIN);
+            const p = realPDF(x) / realMax;
+            if (Math.random() < p) samples.push(x);
+        }
+        return samples;
+    }
+
+    // Generate fake samples
+    function generate(n) {
+        const noise = [];
+        for (let i = 0; i < n; i++) noise.push(Math.random() * 2 - 1);
+        const { output } = forward(G, noise);
+        return { noise, fakes: output.map(o => Math.tanh(o[0]) * 4) };
+    }
+
+    // SGD update for a network (simple gradient descent with momentum)
+    function sgdUpdate(net, grads, lr) {
+        const beta1 = 0.5, beta2 = 0.999, eps = 1e-8;
+        net.t++;
+        const t = net.t;
+        // w1
+        for (let r = 0; r < net.w1.length; r++) {
+            for (let c = 0; c < net.w1[0].length; c++) {
+                net.mw1[r][c] = beta1 * net.mw1[r][c] + (1 - beta1) * grads.dw1[r][c];
+                net.vw1[r][c] = beta2 * net.vw1[r][c] + (1 - beta2) * grads.dw1[r][c] ** 2;
+                const mc = net.mw1[r][c] / (1 - beta1 ** t);
+                const vc = net.vw1[r][c] / (1 - beta2 ** t);
+                net.w1[r][c] -= lr * mc / (Math.sqrt(vc) + eps);
+            }
+        }
+        // b1
+        for (let j = 0; j < net.b1.length; j++) {
+            net.mb1[j] = beta1 * net.mb1[j] + (1 - beta1) * grads.db1[j];
+            net.vb1[j] = beta2 * net.vb1[j] + (1 - beta2) * grads.db1[j] ** 2;
+            const mc = net.mb1[j] / (1 - beta1 ** t);
+            const vc = net.vb1[j] / (1 - beta2 ** t);
+            net.b1[j] -= lr * mc / (Math.sqrt(vc) + eps);
+        }
+        // w2
+        for (let r = 0; r < net.w2.length; r++) {
+            for (let c = 0; c < net.w2[0].length; c++) {
+                net.mw2[r][c] = beta1 * net.mw2[r][c] + (1 - beta1) * grads.dw2[r][c];
+                net.vw2[r][c] = beta2 * net.vw2[r][c] + (1 - beta2) * grads.dw2[r][c] ** 2;
+                const mc = net.mw2[r][c] / (1 - beta1 ** t);
+                const vc = net.vw2[r][c] / (1 - beta2 ** t);
+                net.w2[r][c] -= lr * mc / (Math.sqrt(vc) + eps);
+            }
+        }
+        // b2
+        for (let j = 0; j < net.b2.length; j++) {
+            net.mb2[j] = beta1 * net.mb2[j] + (1 - beta1) * grads.db2[j];
+            net.vb2[j] = beta2 * net.vb2[j] + (1 - beta2) * grads.db2[j] ** 2;
+            const mc = net.mb2[j] / (1 - beta1 ** t);
+            const vc = net.vb2[j] / (1 - beta2 ** t);
+            net.b2[j] -= lr * mc / (Math.sqrt(vc) + eps);
+        }
+    }
+
+    // Train discriminator: maximize log(D(real)) + log(1 - D(fake))
+    function trainD() {
+        const batchSize = 64;
+        const reals = sampleReal(batchSize);
+        const { fakes } = generate(batchSize);
+
+        const { hidden: hReal, output: oReal } = forward(D, reals);
+        const { hidden: hFake, output: oFake } = forward(D, fakes);
+
+        const hidSize = D.b1.length;
+        const dw1 = [[...new Float64Array(hidSize)]];
+        const db1 = new Float64Array(hidSize);
+        const dw2 = [];
+        for (let k = 0; k < hidSize; k++) dw2.push([0]);
+        const db2 = new Float64Array(1);
+
+        for (let i = 0; i < batchSize; i++) {
+            // Real: maximize log(sigmoid(D(x))) → gradient = (1 - sigmoid(D(x)))
+            const dReal = sigmoid(oReal[i][0]);
+            const gradReal = -(1 - dReal) / batchSize;
+            // Fake: maximize log(1 - sigmoid(D(G(z)))) → gradient = sigmoid(D(G(z)))
+            const dFake = sigmoid(oFake[i][0]);
+            const gradFake = dFake / batchSize;
+
+            // Backprop through D for real samples
+            db2[0] += gradReal;
+            for (let k = 0; k < hidSize; k++) {
+                dw2[k][0] += hReal[i][k] * gradReal;
+                const dh = D.w2[k][0] * gradReal * (hReal[i][k] > 0 ? 1 : 0);
+                dw1[0][k] += reals[i] * dh;
+                db1[k] += dh;
+            }
+
+            // Backprop through D for fake samples
+            db2[0] += gradFake;
+            for (let k = 0; k < hidSize; k++) {
+                dw2[k][0] += hFake[i][k] * gradFake;
+                const dh = D.w2[k][0] * gradFake * (hFake[i][k] > 0 ? 1 : 0);
+                dw1[0][k] += fakes[i] * dh;
+                db1[k] += dh;
+            }
+        }
+
+        sgdUpdate(D, { dw1, db1, dw2, db2 }, 0.001);
+    }
+
+    // Train generator: minimize log(1 - D(G(z))) ≈ maximize log(D(G(z)))
+    function trainG() {
+        const batchSize = 64;
+        const noise = [];
+        for (let i = 0; i < batchSize; i++) noise.push(Math.random() * 2 - 1);
+
+        // Forward through G
+        const { hidden: hG, output: oG } = forward(G, noise);
+        const fakes = oG.map(o => Math.tanh(o[0]) * 4);
+
+        // Forward through D
+        const { hidden: hD, output: oD } = forward(D, fakes);
+
+        // Backprop through G (using -log(D(G(z))) loss)
+        const hidSizeG = G.b1.length;
+        const hidSizeD = D.b1.length;
+        const dw1 = [[...new Float64Array(hidSizeG)]];
+        const db1 = new Float64Array(hidSizeG);
+        const dw2 = [];
+        for (let k = 0; k < hidSizeG; k++) dw2.push([0]);
+        const db2 = new Float64Array(1);
+
+        for (let i = 0; i < batchSize; i++) {
+            const dScore = sigmoid(oD[i][0]);
+            // Gradient of -log(D(G(z))) w.r.t. D's input = -(1-dScore)
+            const dLoss_dFake = -(1 - dScore) / batchSize;
+
+            // Gradient through D's network to get d/d(fake)
+            let dLoss_dInput = 0;
+            for (let k = 0; k < hidSizeD; k++) {
+                const dh = D.w2[k][0] * dLoss_dFake * (hD[i][k] > 0 ? 1 : 0);
+                dLoss_dInput += D.w1[0][k] * dh;
+            }
+
+            // Gradient through tanh: d/d(raw) = dLoss_dInput * 4 * (1 - tanh^2)
+            const tanhVal = fakes[i] / 4;
+            const dtanh = dLoss_dInput * 4 * (1 - tanhVal * tanhVal);
+
+            // Backprop through G
+            db2[0] += dtanh;
+            for (let k = 0; k < hidSizeG; k++) {
+                dw2[k][0] += hG[i][k] * dtanh;
+                const dh = G.w2[k][0] * dtanh * (hG[i][k] > 0 ? 1 : 0);
+                dw1[0][k] += noise[i] * dh;
+                db1[k] += dh;
+            }
+        }
+
+        sgdUpdate(G, { dw1, db1, dw2, db2 }, 0.001);
+    }
+
+    function trainStep() {
+        // Train D more than G for stability
+        for (let i = 0; i < 3; i++) trainD();
+        trainG();
+        step++;
+    }
+
+    // --- Drawing ---
+    function toScreenX(x) { return ((x - X_MIN) / (X_MAX - X_MIN)) * W; }
+
+    function draw() {
+        ctx.clearRect(0, 0, W, H);
+
+        const topH = H * 0.55; // Distribution area
+        const botY = H * 0.6;  // Discriminator area
+        const botH = H * 0.35;
+
+        // --- Top: distribution histograms ---
+        // Generate fake samples for histogram
+        const numSamples = 500;
+        const { fakes } = generate(numSamples);
+        const fakeHist = new Float64Array(BINS);
+        for (let i = 0; i < numSamples; i++) {
+            const bin = Math.floor((fakes[i] - X_MIN) / binW);
+            if (bin >= 0 && bin < BINS) fakeHist[bin]++;
+        }
+        // Normalize
+        let fakeMax = 0;
+        for (let i = 0; i < BINS; i++) { fakeHist[i] /= numSamples * binW; if (fakeHist[i] > fakeMax) fakeMax = fakeHist[i]; }
+        const maxVal = Math.max(realMax, fakeMax) * 1.2;
+
+        // Draw grid lines
+        ctx.strokeStyle = '#1a1a1a';
+        ctx.lineWidth = 1;
+        for (let i = 0; i <= 4; i++) {
+            const y = topH - (i / 4) * (topH - 20);
+            ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+        }
+
+        // Bars width
+        const barW = (W / BINS);
+
+        // Real distribution (cyan, semi-transparent fill)
+        for (let i = 0; i < BINS; i++) {
+            const x = i * barW;
+            const h = (realHist[i] / maxVal) * (topH - 30);
+            ctx.fillStyle = 'rgba(0, 229, 255, 0.3)';
+            ctx.fillRect(x, topH - h, barW - 1, h);
+        }
+        // Real distribution outline
+        ctx.beginPath();
+        ctx.moveTo(0, topH);
+        for (let i = 0; i < BINS; i++) {
+            const x = i * barW + barW / 2;
+            const h = (realHist[i] / maxVal) * (topH - 30);
+            ctx.lineTo(x, topH - h);
+        }
+        ctx.lineTo(W, topH);
+        ctx.strokeStyle = '#00e5ff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Fake distribution (pink bars)
+        for (let i = 0; i < BINS; i++) {
+            const x = i * barW;
+            const h = (fakeHist[i] / maxVal) * (topH - 30);
+            ctx.fillStyle = 'rgba(255, 0, 85, 0.35)';
+            ctx.fillRect(x + 1, topH - h, barW - 2, h);
+        }
+        // Fake distribution outline
+        ctx.beginPath();
+        ctx.moveTo(0, topH);
+        for (let i = 0; i < BINS; i++) {
+            const x = i * barW + barW / 2;
+            const h = (fakeHist[i] / maxVal) * (topH - 30);
+            ctx.lineTo(x, topH - h);
+        }
+        ctx.lineTo(W, topH);
+        ctx.strokeStyle = '#ff0055';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Labels
+        ctx.font = '12px Courier New';
+        ctx.textAlign = 'left';
+        ctx.fillStyle = '#00e5ff'; ctx.fillText('■ REAL', 10, 20);
+        ctx.fillStyle = '#ff0055'; ctx.fillText('■ GENERATOR', 80, 20);
+        ctx.fillStyle = '#888'; ctx.textAlign = 'right';
+        ctx.fillText(`STEP: ${step}`, W - 10, 20);
+
+        // --- Divider ---
+        ctx.strokeStyle = '#333'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(0, botY - 10); ctx.lineTo(W, botY - 10); ctx.stroke();
+
+        // --- Bottom: Discriminator curve ---
+        ctx.fillStyle = '#555'; ctx.font = '11px Courier New'; ctx.textAlign = 'left';
+        ctx.fillText('DISCRIMINATOR D(x)', 10, botY + 5);
+        ctx.fillStyle = '#444'; ctx.textAlign = 'right';
+        ctx.fillText('1.0', W - 10, botY + 5);
+        ctx.fillText('0.5', W - 10, botY + botH / 2);
+        ctx.fillText('0.0', W - 10, botY + botH - 5);
+
+        // 0.5 line
+        ctx.strokeStyle = '#333'; ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.moveTo(0, botY + botH / 2);
+        ctx.lineTo(W, botY + botH / 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // D(x) curve
+        const dPoints = 100;
+        ctx.beginPath();
+        for (let i = 0; i <= dPoints; i++) {
+            const x = X_MIN + (i / dPoints) * (X_MAX - X_MIN);
+            const { output } = forward(D, [x]);
+            const dVal = sigmoid(output[0][0]);
+            const sx = toScreenX(x);
+            const sy = botY + botH - dVal * botH;
+            if (i === 0) ctx.moveTo(sx, sy); else ctx.lineTo(sx, sy);
+        }
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 4]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Glow effect on the D curve
+        ctx.beginPath();
+        for (let i = 0; i <= dPoints; i++) {
+            const x = X_MIN + (i / dPoints) * (X_MAX - X_MIN);
+            const { output } = forward(D, [x]);
+            const dVal = sigmoid(output[0][0]);
+            const sx = toScreenX(x);
+            const sy = botY + botH - dVal * botH;
+            if (i === 0) ctx.moveTo(sx, sy); else ctx.lineTo(sx, sy);
+        }
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = 'rgba(255, 255, 255, 0.3)';
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+        ctx.lineWidth = 4;
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+    }
+
+    // --- Controls ---
+    stepBtn.addEventListener('click', () => {
+        trainStep();
+        draw();
+    });
+
+    let isAuto = false;
+    autoBtn.addEventListener('click', () => {
+        if (isAuto) {
+            clearInterval(autoInterval);
+            autoInterval = null;
+            isAuto = false;
+            autoBtn.innerText = 'AUTO-TRAIN';
+            autoBtn.style.background = '#222';
+        } else {
+            isAuto = true;
+            autoBtn.innerText = 'STOP';
+            autoBtn.style.background = '#ff005533';
+            autoInterval = setInterval(() => {
+                trainStep();
+                draw();
+            }, 80);
+        }
+    });
+
+    resetBtn.addEventListener('click', () => {
+        if (autoInterval) { clearInterval(autoInterval); autoInterval = null; isAuto = false; autoBtn.innerText = 'AUTO-TRAIN'; autoBtn.style.background = '#222'; }
+        initNetworks();
+        draw();
+    });
+
+    draw();
+})();
+
+// ==========================================
 // 13. MANIFOLDS & LATENT SPACES
 // ==========================================
 (function () {
