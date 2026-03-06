@@ -319,8 +319,8 @@
             counter-reset: toc-counter 24;
         }
 
-        .toc ol[start="30"] {
-            counter-reset: toc-counter 29;
+        .toc ol[start="31"] {
+            counter-reset: toc-counter 30;
         }
 
         .toc-part {

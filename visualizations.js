@@ -6515,8 +6515,8 @@
 
     // Milestones
     const milestones = [
-        { capLabel: 'LANGUAGE', capThreshold: 0.12, color: '#00e5ff' },
-        { capLabel: 'VISION', capThreshold: 0.22, color: '#00ff88' },
+        { capLabel: 'VISION', capThreshold: 0.12, color: '#00ff88' },
+        { capLabel: 'LANGUAGE', capThreshold: 0.22, color: '#00e5ff' },
         { capLabel: 'REASONING', capThreshold: 0.4, color: '#ffd700' },
         { capLabel: 'SELF-IMPROVEMENT', capThreshold: 0.65, color: '#ff6600' },
         { capLabel: 'SUPERINTELLIGENCE', capThreshold: 0.92, color: '#ff0055' }
@@ -6540,25 +6540,22 @@
 
         // Recursive phase
         const recursiveSteps = time - maxT * 0.25;
-        const compoundRate = 1 + (rate - 1) * 0.015;
+        const compoundRate = Math.pow(rate, 0.25);
         const expCap = linearCap * Math.pow(compoundRate, recursiveSteps);
         return Math.min(expCap, 5.0); // cap for display
     }
 
     function toScreen(time, cap) {
-        // time: 0..maxT → PAD_L..PAD_L+plotW
-        // cap: 0..1 → PAD_T+plotH..PAD_T (log scale becomes tricky, let's use custom mapping)
         const x = PAD_L + (time / maxT) * plotW;
-        // Use a combination for display: linear up to 1, then compress
+        // 0→1.0 fills bottom 77% of plot; above 1.0 shoots to top (vertical spike)
         let displayY;
         if (cap <= 1.0) {
-            displayY = cap;
+            displayY = cap * 0.77;
         } else {
-            // Logarithmic compression above 1
-            displayY = 1.0 + Math.log2(cap) * 0.15;
+            // Rapid rise — makes the line look vertical past AGI
+            displayY = 0.77 + Math.min(0.23, (cap - 1.0) * 0.5);
         }
-        displayY = Math.min(displayY, 1.3);
-        const y = PAD_T + plotH * (1 - displayY / 1.3);
+        const y = PAD_T + plotH * (1 - displayY);
         return { x, y };
     }
 
@@ -6773,7 +6770,7 @@
             return;
         }
 
-        t += 0.7;
+        t += 0.35;
 
         // Build curve arrays
         const hCap = humanCapability(t);
@@ -6848,5 +6845,261 @@
         }
     });
 
+    draw();
+})();
+
+// ==========================================
+// 25. MULTI-ARMED BANDITS (ε-GREEDY)
+// ==========================================
+(function () {
+    const canvas = document.getElementById('banditCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const playBtn = document.getElementById('bandit-play-btn');
+    const resetBtn = document.getElementById('bandit-reset-btn');
+    const epsSlider = document.getElementById('bandit-eps-slider');
+    const epsVal = document.getElementById('bandit-eps-val');
+
+    const W = canvas.width, H = canvas.height;
+    const NUM_ARMS = 5;
+    const TOTAL_ROUNDS = 200;
+    const COLORS = ['#00e5ff', '#a855f7', '#00ff88', '#ffd700', '#ff0055'];
+
+    let epsilon = 0.10;
+    let arms = [];
+    let estimates = [];
+    let pulls = [];
+    let totalReward = 0;
+    let round = 0;
+    let animId = null;
+    let simulating = false;
+    let lastPulled = -1;
+    let lastWin = false;
+    let rewardHistory = [];
+
+    function initArms() {
+        arms = [];
+        estimates = [];
+        pulls = [];
+        for (let i = 0; i < NUM_ARMS; i++) {
+            arms.push(0.1 + Math.random() * 0.7); // true payout probability
+            estimates.push(0);
+            pulls.push(0);
+        }
+        totalReward = 0;
+        round = 0;
+        lastPulled = -1;
+        lastWin = false;
+        rewardHistory = [];
+    }
+
+    function epsilonGreedy() {
+        if (Math.random() < epsilon) {
+            return Math.floor(Math.random() * NUM_ARMS);
+        }
+        let bestArm = 0, bestVal = -1;
+        for (let i = 0; i < NUM_ARMS; i++) {
+            if (estimates[i] > bestVal) { bestVal = estimates[i]; bestArm = i; }
+        }
+        return bestArm;
+    }
+
+    function pullArm(armIdx) {
+        const reward = Math.random() < arms[armIdx] ? 1 : 0;
+        pulls[armIdx]++;
+        estimates[armIdx] += (reward - estimates[armIdx]) / pulls[armIdx];
+        totalReward += reward;
+        round++;
+        lastPulled = armIdx;
+        lastWin = reward === 1;
+        rewardHistory.push(totalReward / round);
+        return reward;
+    }
+
+    // --- Drawing ---
+    function draw() {
+        ctx.clearRect(0, 0, W, H);
+        ctx.fillStyle = '#0a0a0f';
+        ctx.fillRect(0, 0, W, H);
+
+        const barAreaX = 30, barAreaW = 380, barAreaTop = 40, barAreaH = H - 80;
+        const chartX = 440, chartW = W - chartX - 20, chartTop = 40, chartH = barAreaH;
+        const barW = barAreaW / NUM_ARMS - 12;
+
+        // --- Left: Bar chart of machines ---
+        ctx.strokeStyle = '#1a1a1a';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(barAreaX, barAreaTop, barAreaW, barAreaH);
+
+        // Grid lines
+        for (let g = 0; g <= 4; g++) {
+            const gy = barAreaTop + (g / 4) * barAreaH;
+            ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+            ctx.beginPath(); ctx.moveTo(barAreaX, gy); ctx.lineTo(barAreaX + barAreaW, gy); ctx.stroke();
+            ctx.fillStyle = '#333'; ctx.font = '8px Courier New'; ctx.textAlign = 'right';
+            ctx.fillText((1 - g / 4).toFixed(1), barAreaX - 3, gy + 3);
+        }
+
+        ctx.fillStyle = '#444'; ctx.font = '10px Courier New'; ctx.textAlign = 'center';
+        ctx.fillText('PAYOUT RATE', barAreaX + barAreaW / 2, barAreaTop - 8);
+
+        for (let i = 0; i < NUM_ARMS; i++) {
+            const bx = barAreaX + 8 + i * (barW + 12);
+            const estH = estimates[i] * barAreaH;
+            const barY = barAreaTop + barAreaH - estH;
+
+            // Estimated bar
+            const grad = ctx.createLinearGradient(bx, barY, bx, barAreaTop + barAreaH);
+            grad.addColorStop(0, COLORS[i]);
+            grad.addColorStop(1, COLORS[i] + '33');
+            ctx.fillStyle = grad;
+            ctx.fillRect(bx, barY, barW, estH);
+
+            // Border
+            ctx.strokeStyle = COLORS[i];
+            ctx.lineWidth = lastPulled === i ? 2.5 : 1;
+            ctx.strokeRect(bx, barY, barW, estH);
+
+            // Pull highlight
+            if (lastPulled === i) {
+                ctx.shadowBlur = 12;
+                ctx.shadowColor = COLORS[i];
+                ctx.strokeRect(bx, barY, barW, estH);
+                ctx.shadowBlur = 0;
+
+                // Win/lose indicator
+                ctx.fillStyle = lastWin ? '#00ff88' : '#ff0055';
+                ctx.font = 'bold 14px Courier New'; ctx.textAlign = 'center';
+                ctx.fillText(lastWin ? '✓ WIN' : '✗ LOSE', bx + barW / 2, barY - 12);
+            }
+
+            // True probability (shown after sim)
+            if (round >= TOTAL_ROUNDS) {
+                const trueH = arms[i] * barAreaH;
+                const trueY = barAreaTop + barAreaH - trueH;
+                ctx.setLineDash([4, 3]);
+                ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(bx - 2, trueY);
+                ctx.lineTo(bx + barW + 2, trueY);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                // Star on best arm
+                const bestArm = arms.indexOf(Math.max(...arms));
+                if (i === bestArm) {
+                    ctx.fillStyle = '#ffd700';
+                    ctx.font = '16px serif'; ctx.textAlign = 'center';
+                    ctx.fillText('★', bx + barW / 2, trueY - 5);
+                }
+            }
+
+            // Label
+            ctx.fillStyle = '#666'; ctx.font = '10px Courier New'; ctx.textAlign = 'center';
+            ctx.fillText(`#${i + 1}`, bx + barW / 2, barAreaTop + barAreaH + 14);
+            ctx.fillStyle = '#444'; ctx.font = '8px Courier New';
+            ctx.fillText(`${pulls[i]} pulls`, bx + barW / 2, barAreaTop + barAreaH + 26);
+        }
+
+        // --- Right: Reward history ---
+        ctx.strokeStyle = '#1a1a1a';
+        ctx.strokeRect(chartX, chartTop, chartW, chartH);
+
+        ctx.fillStyle = '#444'; ctx.font = '10px Courier New'; ctx.textAlign = 'center';
+        ctx.fillText('AVG REWARD OVER TIME', chartX + chartW / 2, chartTop - 8);
+
+        if (rewardHistory.length > 1) {
+            ctx.beginPath();
+            for (let i = 0; i < rewardHistory.length; i++) {
+                const x = chartX + (i / (TOTAL_ROUNDS - 1)) * chartW;
+                const y = chartTop + chartH - rewardHistory[i] * chartH;
+                if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+            }
+            ctx.strokeStyle = '#00ff88';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.shadowBlur = 6; ctx.shadowColor = '#00ff88'; ctx.stroke(); ctx.shadowBlur = 0;
+        }
+
+        // Best possible line
+        if (round > 0) {
+            const bestProb = Math.max(...arms);
+            const bestY = chartTop + chartH - bestProb * chartH;
+            ctx.setLineDash([4, 4]);
+            ctx.strokeStyle = 'rgba(255, 215, 0, 0.3)';
+            ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.moveTo(chartX, bestY); ctx.lineTo(chartX + chartW, bestY); ctx.stroke();
+            ctx.setLineDash([]);
+            if (round >= TOTAL_ROUNDS) {
+                ctx.fillStyle = '#ffd700'; ctx.font = '8px Courier New'; ctx.textAlign = 'left';
+                ctx.fillText('OPTIMAL', chartX + 3, bestY - 4);
+            }
+        }
+
+        // Grid labels for chart
+        ctx.fillStyle = '#333'; ctx.font = '8px Courier New'; ctx.textAlign = 'right';
+        ctx.fillText('1.0', chartX - 3, chartTop + 3);
+        ctx.fillText('0.0', chartX - 3, chartTop + chartH + 3);
+
+        // HUD
+        ctx.fillStyle = '#555'; ctx.font = '11px Courier New'; ctx.textAlign = 'center';
+        ctx.fillText(`ROUND: ${round}/${TOTAL_ROUNDS}   |   TOTAL: ${totalReward}   |   ε: ${epsilon.toFixed(2)}`, W / 2, H - 8);
+
+        if (round === 0) {
+            ctx.fillStyle = 'rgba(0, 229, 255, 0.4)';
+            ctx.font = '12px Courier New'; ctx.textAlign = 'center';
+            ctx.fillText('Five slot machines. Which one pays best?', barAreaX + barAreaW / 2, barAreaTop + barAreaH / 2);
+        }
+
+        if (round >= TOTAL_ROUNDS) {
+            ctx.fillStyle = '#666'; ctx.font = '9px Courier New'; ctx.textAlign = 'center';
+            ctx.fillText('DASHED = TRUE PAYOUT RATE  |  ★ = BEST MACHINE', barAreaX + barAreaW / 2, barAreaTop + barAreaH + 38);
+        }
+    }
+
+    function step() {
+        if (round >= TOTAL_ROUNDS) {
+            simulating = false;
+            playBtn.innerText = 'PLAY 200 ROUNDS';
+            draw();
+            return;
+        }
+        const arm = epsilonGreedy();
+        pullArm(arm);
+        draw();
+
+        if (simulating) {
+            animId = setTimeout(step, 30);
+        }
+    }
+
+    playBtn.addEventListener('click', () => {
+        if (simulating) {
+            simulating = false;
+            if (animId) clearTimeout(animId);
+            playBtn.innerText = 'PLAY 200 ROUNDS';
+            return;
+        }
+        if (round >= TOTAL_ROUNDS) initArms();
+        simulating = true;
+        playBtn.innerText = 'PAUSE';
+        step();
+    });
+
+    resetBtn.addEventListener('click', () => {
+        simulating = false;
+        if (animId) clearTimeout(animId);
+        playBtn.innerText = 'PLAY 200 ROUNDS';
+        initArms();
+        draw();
+    });
+
+    epsSlider.addEventListener('input', () => {
+        epsilon = parseFloat(epsSlider.value);
+        epsVal.innerText = epsilon.toFixed(2);
+    });
+
+    initArms();
     draw();
 })();

@@ -82,6 +82,7 @@
 
         <p class="toc-part">Part IV — Reinforcement Learning</p>
         <ol start="25">
+            <li><a href="#sec-bandits">The Gambler's Dilemma (Multi-Armed Bandits)</a></li>
             <li><a href="#sec-rl">Learning by Doing</a></li>
             <li><a href="#sec-ga">Survival of the Fittest (Genetic Algorithms)</a></li>
             <li><a href="#sec-dqn">The Neural Strategist (Deep Q-Learning)</a></li>
@@ -90,7 +91,7 @@
         </ol>
 
         <p class="toc-part">Closing</p>
-        <ol start="30">
+        <ol start="31">
             <li><a href="#sec-singularity">The Recursive Horizon (The Singularity)</a></li>
             <li><a href="#sec-illusion">The Illusion of Intelligence</a></li>
             <li><a href="#sec-quiz">Test Your Understanding</a></li>
@@ -961,7 +962,51 @@
     </div>
 
     <span class="section-tag tag-advanced">ADVANCED</span>
-    <h2 id="sec-rl">25. Learning by Doing (Reinforcement Learning)</h2>
+    <h2 id="sec-bandits">25. The Gambler's Dilemma (Multi-Armed Bandits)</h2>
+    <p>Before we teach an agent to navigate environments and plan ahead, there is a simpler, more
+        fundamental problem. Imagine you are standing in front of a row of slot machines. Each machine
+        has a different, unknown probability of paying out. You have a limited number of pulls. How do
+        you maximize your total winnings?</p>
+
+    <p>This is the <strong>Multi-Armed Bandit</strong> problem, and it captures the deepest tension in
+        all of reinforcement learning: <strong>exploration vs. exploitation</strong>. Do you keep pulling
+        the machine that has paid well so far (<em>exploit</em>), or do you try a new machine that might
+        be even better (<em>explore</em>)? Pull the known winner too much and you might miss a jackpot.
+        Explore too much and you waste pulls on losing machines.</p>
+
+    <p>The classic solution is <strong>ε-greedy</strong>: with probability ε (say, 10%), pull a random
+        machine to explore. The rest of the time, pull whichever machine has the highest average payout
+        so far. Over time, the agent converges on the best machine while still occasionally sampling
+        alternatives. More sophisticated strategies like <strong>Upper Confidence Bound (UCB)</strong>
+        balance exploration mathematically, favouring machines that have been tried fewer times.</p>
+
+    <div class="interactive-container" style="min-height: 520px; padding-bottom: 2rem;">
+        <canvas id="banditCanvas" width="700" height="360"></canvas>
+        <div class="controls">
+            <div class="slider-group">
+                <label>EXPLORATION (ε): <span id="bandit-eps-val">0.10</span></label>
+                <input type="range" id="bandit-eps-slider" min="0" max="0.5" step="0.01" value="0.10"
+                    style="width: 140px;">
+            </div>
+            <button id="bandit-play-btn">PLAY 200 ROUNDS</button>
+            <button id="bandit-reset-btn"
+                style="background:#222; color:#ff0055; border: 1px solid #ff0055;">RESET</button>
+        </div>
+        <p
+            style="font-size: 0.9rem; color: #888; text-align: center; margin-top: 1rem; font-family: 'Courier New', monospace;">
+            Five slot machines with hidden payout rates. Watch the ε-greedy agent learn which machine
+            is best. Adjust ε to see how exploration rate affects total reward.
+        </p>
+    </div>
+
+    <p>The bandit problem appears everywhere in the real world: which ad to show a user, which drug
+        dosage to try next, which route to drive home. Every recommendation engine, A/B test, and
+        clinical trial is, at its core, a multi-armed bandit. And it is the foundation upon which all
+        of reinforcement learning is built — because once we add <em>states</em> and <em>transitions</em>
+        to the bandit framework, we get the full RL problem.</p>
+
+    <span class="section-tag tag-advanced">ADVANCED</span>
+    <h2 id="sec-rl">26. Learning by Doing (Reinforcement Learning)</h2>
     <p>Supervised learning needs labels. Self-supervised learning extracts labels from the data itself. But what about
         problems where there <em>is</em> no dataset at all—just an environment you can interact with?</p>
 
@@ -1006,7 +1051,7 @@
         across millions of possible states—turning brute-force memorization into genuine strategic reasoning.</p>
 
     <span class="section-tag tag-reasoning">REASONING</span>
-    <h2 id="sec-ga">26. Survival of the Fittest (Genetic Algorithms)</h2>
+    <h2 id="sec-ga">27. Survival of the Fittest (Genetic Algorithms)</h2>
     <p>While gradient descent is powerful, it requires knowing the derivative of our error—the "slope of the hill." But
         what if the landscape is so rugged, or the rules so complex, that we can't easily calculate a gradient? What if
         we are training a robot to walk, and there is no simple mathematical equation linking a twitch of a motor to the
@@ -1042,7 +1087,7 @@
         mathematical elegance for brute-force adaptability.</p>
 
     <span class="section-tag tag-advanced">ADVANCED</span>
-    <h2 id="sec-dqn">27. The Neural Strategist (Deep Q-Learning)</h2>
+    <h2 id="sec-dqn">28. The Neural Strategist (Deep Q-Learning)</h2>
     <p>Our Q-Table from the previous section works beautifully for a small grid. But what happens when the
         state space explodes? A game of Atari has billions of possible screen configurations. A Go board has more
         legal positions than atoms in the universe. No table could ever hold all of those entries.</p>
@@ -1084,7 +1129,7 @@
     </p>
 
     <span class="section-tag tag-advanced">ADVANCED</span>
-    <h2 id="sec-mcts">28. Mastering Games (AlphaZero & MCTS)</h2>
+    <h2 id="sec-mcts">29. Mastering Games (AlphaZero & MCTS)</h2>
     <p>Deep Q-Networks learn to play games by trial and error, but there's a fundamentally different approach:
         <strong>planning ahead</strong>. When a chess grandmaster considers a move, they don't just react to the
         current board—they simulate future sequences of play, evaluating which paths lead to victory. This is
@@ -1122,7 +1167,7 @@
         All from pure self-play, guided by search and a neural network working in concert.</p>
 
     <span class="section-tag tag-reasoning">REASONING</span>
-    <h2 id="sec-cot">29. Thinking Out Loud (Chain of Thought)</h2>
+    <h2 id="sec-cot">30. Thinking Out Loud (Chain of Thought)</h2>
     <p>Every technique we have built so far—self-supervised pre-training, attention, MCTS—produces
         models that answer <em>instantly</em>. One forward pass, one prediction. For simple questions
         this works beautifully. But ask a model to solve a hard math problem like <span class="equation">17 × 24</span>,
@@ -1178,7 +1223,7 @@
     </p>
 
     <span class="section-tag">PHILOSOPHY</span>
-    <h2 id="sec-singularity">30. The Recursive Horizon (The Singularity)</h2>
+    <h2 id="sec-singularity">31. The Recursive Horizon (The Singularity)</h2>
     <p>We have just witnessed something unsettling. A model trained with reinforcement learning
         <em>spontaneously invented self-correction</em> — it learned to doubt itself, to backtrack, to
         think harder. Nobody told it to do this. The reward signal alone was enough. Now ask yourself: what
@@ -1232,7 +1277,7 @@
         question is not whether we will build each rung. It is whether the ladder has a ceiling.</p>
 
     <span class="section-tag">PHILOSOPHY</span>
-    <h2 id="sec-illusion">31. The Illusion of Intelligence</h2>
+    <h2 id="sec-illusion">32. The Illusion of Intelligence</h2>
     <p>What is a Neural Network, truly? We have seen that it is not a brain. It does not "think." It is purely a
         parametric mathematical function. It is nothing more than a series of matrix multiplications interspersed with
         simple, non-linear hinges.</p>
@@ -1279,7 +1324,7 @@ W2 = np.random.randn(3, 1)
     <p>It looks entirely alien compared to the pulsing brains of science fiction. It is just arrays of numbers,
         multiplied and selectively zeroed out, slowly falling down a mathematical valley.</p>
 
-    <h2 id="sec-quiz">32. Test Your Understanding</h2>
+    <h2 id="sec-quiz">33. Test Your Understanding</h2>
     <p>To truly understand it from first principles, you must build it yourself. Below is a live Python environment.
         Write the code for each core component we discussed. You can use <code>print()</code> to debug your logic—the
         output will appear in the console below.</p>
