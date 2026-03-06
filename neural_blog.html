@@ -93,7 +93,6 @@
         <p class="toc-part">Closing</p>
         <ol start="31">
             <li><a href="#sec-singularity">The Recursive Horizon (The Singularity)</a></li>
-            <li><a href="#sec-illusion">The Illusion of Intelligence</a></li>
             <li><a href="#sec-quiz">Test Your Understanding</a></li>
         </ol>
     </nav>
@@ -1276,55 +1275,7 @@
         descent, attention, reinforcement learning, chain of thought — is a rung on this ladder. The
         question is not whether we will build each rung. It is whether the ladder has a ceiling.</p>
 
-    <span class="section-tag">PHILOSOPHY</span>
-    <h2 id="sec-illusion">32. The Illusion of Intelligence</h2>
-    <p>What is a Neural Network, truly? We have seen that it is not a brain. It does not "think." It is purely a
-        parametric mathematical function. It is nothing more than a series of matrix multiplications interspersed with
-        simple, non-linear hinges.</p>
-    <p>When you interact with modern AI, whether it is generating a photorealistic image or continuing a text prompt, it
-        is converting your input into a coordinate in a high-dimensional space, and then folding, bending, and
-        transforming that space through thousands of layers until it projects a result back to you. The resulting
-        emergent behavior can feel profound, but the mechanism is simply geometry.</p>
-
-    <h2 id="sec-code">The Machine in 10 Lines</h2>
-    <p>When you peel away the interactive sliders and the 3D graphs, everything we have discussed—the lines, the folds,
-        the forward passes, and the backward flow of error—compiles down into remarkably simple matrix math.</p>
-
-    <p>Here is what all of those concepts look like when distilled into Python using the NumPy library. This is a real,
-        functional neural network:</p>
-
-    <div style="background:#111; border: 1px solid #333; border-radius: 6px; padding: 1.5rem; margin-bottom: 2rem;">
-        <pre style="margin:0; color:#b0b0b0; font-family:'Courier New', monospace; font-size: 15px; overflow-x: auto;">
-<span style="color:#ff0055">import</span> numpy <span style="color:#ff0055">as</span> np
-
-<span style="color:#666"># 1. Initialize random weights for a 2-layer network</span>
-W1 = np.random.randn(2, 3) 
-W2 = np.random.randn(3, 1) 
-
-<span style="color:#ff0055">for</span> step <span style="color:#ff0055">in</span> <span style="color:#00e5ff">range</span>(100):
-    <span style="color:#666"># 2. Forward Pass: Draw lines and fold space</span>
-    hidden = np.maximum(0, np.dot(X, W1)) 
-    output = np.dot(hidden, W2)           
-    
-    <span style="color:#666"># 3. Calculate Error (Loss)</span>
-    loss = np.mean((output - y_true) ** 2)
-    
-    <span style="color:#666"># 4. Backpropagation: Calculate slopes</span>
-    d_output = 2 * (output - y_true) / <span style="color:#00e5ff">len</span>(X)
-    d_W2 = np.dot(hidden.T, d_output)
-    d_hidden = np.dot(d_output, W2.T) * (hidden > 0) <span style="color:#666"># Undo the ReLU fold</span>
-    d_W1 = np.dot(X.T, d_hidden)
-    
-    <span style="color:#666"># 5. Gradient Descent: Take a step downhill</span>
-    W1 -= 0.01 * d_W1
-    W2 -= 0.01 * d_W2
-</pre>
-    </div>
-
-    <p>It looks entirely alien compared to the pulsing brains of science fiction. It is just arrays of numbers,
-        multiplied and selectively zeroed out, slowly falling down a mathematical valley.</p>
-
-    <h2 id="sec-quiz">33. Test Your Understanding</h2>
+    <h2 id="sec-quiz">32. Test Your Understanding</h2>
     <p>To truly understand it from first principles, you must build it yourself. Below is a live Python environment.
         Write the code for each core component we discussed. You can use <code>print()</code> to debug your logic—the
         output will appear in the console below.</p>
