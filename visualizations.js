@@ -4234,6 +4234,146 @@
 })();
 
 // ==========================================
+// 13.5 SEEING THE FUTURE (MINIMAX)
+// ==========================================
+(function () {
+    const canvas = document.getElementById('minimaxCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const stepBtn = document.getElementById('minimax-step-btn');
+    const resetBtn = document.getElementById('minimax-reset-btn');
+
+    const W = canvas.width, H = canvas.height;
+
+    // Define a static tree
+    let nodes = [
+        { id: 'root', type: 'MAX', x: W / 2, y: 50, val: null, children: [1, 2], bestChild: null }, // 0
+        { id: 'L', type: 'MIN', x: W / 4, y: 150, val: null, children: [3, 4], bestChild: null }, // 1
+        { id: 'R', type: 'MIN', x: (W / 4) * 3, y: 150, val: null, children: [5, 6], bestChild: null }, // 2
+        { id: 'LL', type: 'LEAF', x: W / 8, y: 250, val: 3, children: [], bestChild: null }, // 3
+        { id: 'LR', type: 'LEAF', x: (W / 8) * 3, y: 250, val: 5, children: [], bestChild: null }, // 4
+        { id: 'RL', type: 'LEAF', x: (W / 8) * 5, y: 250, val: -2, children: [], bestChild: null }, // 5
+        { id: 'RR', type: 'LEAF', x: (W / 8) * 7, y: 250, val: 9, children: [], bestChild: null } // 6
+    ];
+
+    let state = 0; // 0=hidden leaves, 1=show leaves, 2=eval MIN, 3=eval MAX
+
+    function draw() {
+        ctx.fillStyle = '#0f0f0f';
+        ctx.fillRect(0, 0, W, H);
+
+        ctx.lineWidth = 2;
+        for (let i = 0; i < nodes.length; i++) {
+            let n = nodes[i];
+            for (let c of n.children) {
+                let child = nodes[c];
+
+                if (n.bestChild === c && n.val !== null) {
+                    ctx.strokeStyle = '#00e5ff';
+                    ctx.lineWidth = 4;
+                } else {
+                    ctx.strokeStyle = '#444';
+                    ctx.lineWidth = 2;
+                }
+
+                ctx.beginPath();
+                ctx.moveTo(n.x, n.y);
+                ctx.lineTo(child.x, child.y);
+                ctx.stroke();
+            }
+        }
+
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = 'bold 16px Courier New';
+
+        for (let n of nodes) {
+            ctx.beginPath();
+            if (n.type === 'MAX') {
+                ctx.arc(n.x, n.y, 25, 0, Math.PI * 2);
+            } else if (n.type === 'MIN') {
+                ctx.rect(n.x - 22, n.y - 22, 44, 44);
+            } else {
+                ctx.arc(n.x, n.y, 20, 0, Math.PI * 2);
+            }
+
+            if (n.type === 'LEAF') {
+                ctx.fillStyle = (state >= 1) ? '#ffb703' : '#333';
+            } else if (n.type === 'MIN') {
+                ctx.fillStyle = (state >= 2 && n.val !== null) ? '#ff0055' : '#222';
+            } else {
+                ctx.fillStyle = (state >= 3 && n.val !== null) ? '#00e5ff' : '#222';
+            }
+            ctx.fill();
+
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            ctx.fillStyle = '#fff';
+            if (n.type === 'LEAF') {
+                if (state >= 1) ctx.fillText(n.val, n.x, n.y);
+            } else {
+                if (n.val !== null) {
+                    ctx.fillText(n.val, n.x, n.y);
+                } else {
+                    ctx.fillStyle = '#888';
+                    ctx.font = '12px Courier New';
+                    ctx.fillText(n.type, n.x, n.y);
+                    ctx.font = 'bold 16px Courier New';
+                }
+            }
+        }
+
+        ctx.font = '14px Courier New';
+        ctx.fillStyle = '#aaa';
+        ctx.textAlign = 'left';
+        ctx.fillText("Circles = MAX (Takes Highest)", 20, 30);
+        ctx.fillText("Squares = MIN (Takes Lowest)", 20, 50);
+    }
+
+    if (stepBtn) {
+        stepBtn.addEventListener('click', () => {
+            if (state === 0) {
+                state = 1;
+                stepBtn.innerText = 'STEP (MINIMIZERS CHOOSE)';
+            } else if (state === 1) {
+                state = 2;
+                nodes[1].val = Math.min(nodes[3].val, nodes[4].val);
+                nodes[1].bestChild = (nodes[3].val < nodes[4].val) ? 3 : 4;
+
+                nodes[2].val = Math.min(nodes[5].val, nodes[6].val);
+                nodes[2].bestChild = (nodes[5].val < nodes[6].val) ? 5 : 6;
+
+                stepBtn.innerText = 'STEP (MAXIMIZER CHOOSES)';
+            } else if (state === 2) {
+                state = 3;
+                nodes[0].val = Math.max(nodes[1].val, nodes[2].val);
+                nodes[0].bestChild = (nodes[1].val > nodes[2].val) ? 1 : 2;
+
+                stepBtn.innerText = 'FINISHED (OPTIMAL PATH HIGHLIGHTED)';
+                stepBtn.disabled = true;
+            }
+            draw();
+        });
+    }
+
+    if (resetBtn) {
+        resetBtn.addEventListener('click', () => {
+            state = 0;
+            nodes[0].val = null; nodes[0].bestChild = null;
+            nodes[1].val = null; nodes[1].bestChild = null;
+            nodes[2].val = null; nodes[2].bestChild = null;
+            stepBtn.innerText = 'STEP (EVALUATE LEAVES)';
+            stepBtn.disabled = false;
+            draw();
+        });
+    }
+
+    draw();
+})();
+
+// ==========================================
 // 14. ALPHAZERO & MCTS — TIC-TAC-TOE
 // ==========================================
 (function () {
