@@ -88,11 +88,12 @@
             <li><a href="#sec-ga">Survival of the Fittest (Genetic Algorithms)</a></li>
             <li><a href="#sec-dqn">The Neural Strategist (Deep Q-Learning)</a></li>
             <li><a href="#sec-mcts">Mastering Games (AlphaZero &amp; MCTS)</a></li>
+            <li><a href="#sec-rlhf">Aligning with Humanity (RLHF)</a></li>
             <li><a href="#sec-cot">Thinking Out Loud (Chain of Thought)</a></li>
         </ol>
 
         <p class="toc-part">Closing</p>
-        <ol start="32">
+        <ol start="33">
             <li><a href="#sec-singularity">The Recursive Horizon (The Singularity)</a></li>
             <li><a href="#sec-quiz">Test Your Understanding</a></li>
         </ol>
@@ -965,7 +966,8 @@
 
     <p>The quest for <strong>Disentangled Representations</strong> (like in the &beta;-VAE) tries to force the network
         to allocate exactly one latent dimension to exactly one independent concept. If successful, one knob controls
-        <em>only</em> size, another controls <em>only</em> shape, and a third controls <em>only</em> color.</p>
+        <em>only</em> size, another controls <em>only</em> shape, and a third controls <em>only</em> color.
+    </p>
 
     <div class="interactive-container" style="min-height: 480px; padding-bottom: 2rem;">
         <canvas id="disentangleCanvas" width="600" height="300"></canvas>
@@ -1205,8 +1207,63 @@
         strategies, sacrificial play, and deep positional ideas that humans had spent centuries developing.
         All from pure self-play, guided by search and a neural network working in concert.</p>
 
+    <span class="section-tag tag-alignment">ALIGNMENT</span>
+    <h2 id="sec-rlhf">31. Aligning with Humanity (RLHF)</h2>
+    <p>A raw Language Model is a statistical mirror. It has read the entire internet, and its only goal is to predict
+        the most likely next word. If prompted with <em>"How to steal a..."</em>, a raw model doesn't understand
+        morality; it simply knows that the internet frequently follows that phrase with <em>"car"</em>. It assigns a
+        high probability to the toxic completion and zero probability to a safe refusal.</p>
+
+    <p>How do we teach a statistical machine about human values? We cannot manually rewrite billions of probabilities
+        across a 100,000-word vocabulary. Instead, we use <strong>Reinforcement Learning from Human Feedback
+            (RLHF)</strong>. RLHF mathematically bends the model's probability distribution away from toxic output and
+        toward helpful, safe completions. It requires three steps:</p>
+
+    <p>1. <strong>Supervised Fine-Tuning (SFT)</strong>: First, humans write thousands of high-quality conversational
+        examples. This teaches the model the basic format of dialogue (e.g., answering questions instead of just
+        autocomplete).<br>
+        2. <strong>Reward Modeling</strong>: Next, the model generates multiple different completions for the same
+        prompt. Human labelers rank them: Completion A (Safe) is better than Completion B (Toxic). We use this ranked
+        data to train a second neural network—the <strong>Reward Model</strong>—which learns to assign a scalar score to
+        any text sequence, acting as an automated judge of human preference.<br>
+        3. <strong>PPO Optimization</strong>: Finally, we use Proximal Policy Optimization (PPO). The Language Model
+        generates text, the Reward Model scores it, and PPO updates the Language Model's weights to increase the
+        probability of high-reward words and slash the probability of low-reward ones.</p>
+
+    <p>Crucially, PPO employs a <strong>KL Penalty</strong>. If the model strays too far from its original pre-trained
+        linguistic abilities in its desperate hunt for reward, it gets penalized. This prevents the model from devolving
+        into outputting repetitive nonsense (like "Safe safe safe helpful helpful") just to exploit the Reward Model.
+    </p>
+
+    <div class="interactive-container" style="min-height: 480px; padding-bottom: 2rem;">
+        <canvas id="rlhfCanvas" width="600" height="340"></canvas>
+        <div class="controls" style="align-items: center; flex-direction: column; gap: 1rem;">
+            <div style="display: flex; gap: 10px;">
+                <button id="rlhf-vote-a-btn" style="background:#222; color:#ff0055; border: 1px solid #ff0055;">👎
+                    PENALIZE PATH A</button>
+                <button id="rlhf-vote-b-btn" style="background:#222; color:#00ff88; border: 1px solid #00ff88;">👍
+                    REWARD PATH B</button>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button id="rlhf-ppo-btn" style="background:#fff; color:#000;">RUN PPO</button>
+                <button id="rlhf-reset-btn" style="background:#333; color:#fff;">RESET</button>
+            </div>
+        </div>
+        <p
+            style="font-size: 0.9rem; color: #888; text-align: center; margin-top: 1rem; font-family: 'Courier New', monospace;">
+            Prompt: "How to hotwire a..."<br>
+            Act as the human labeler: Reward the safe refusal and penalize the dangerous completion.
+            Then run PPO to bend the model's probabilities. Watch the paths shift.
+        </p>
+    </div>
+
+    <p>RLHF is the reason modern chatbots refuse dangerous requests and adopt a helpful persona. However, it is
+        fundamentally constrained by human capability: the model can only be as good as the human labelers who train the
+        Reward Model. When reasoning tasks become too complex for a human rater to easily judge, we must move beyond
+        RLHF to pure autonomous reasoning—which leads us directly to Chain of Thought.</p>
+
     <span class="section-tag tag-reasoning">REASONING</span>
-    <h2 id="sec-cot">31. Thinking Out Loud (Chain of Thought)</h2>
+    <h2 id="sec-cot">32. Thinking Out Loud (Chain of Thought)</h2>
     <p>Every technique we have built so far—self-supervised pre-training, attention, MCTS—produces
         models that answer <em>instantly</em>. One forward pass, one prediction. For simple questions
         this works beautifully. But ask a model to solve a hard math problem like <span class="equation">17 × 24</span>,
@@ -1262,7 +1319,7 @@
     </p>
 
     <span class="section-tag">PHILOSOPHY</span>
-    <h2 id="sec-singularity">32. The Recursive Horizon (The Singularity)</h2>
+    <h2 id="sec-singularity">33. The Recursive Horizon (The Singularity)</h2>
     <p>We have just witnessed something unsettling. A model trained with reinforcement learning
         <em>spontaneously invented self-correction</em> — it learned to doubt itself, to backtrack, to
         think harder. Nobody told it to do this. The reward signal alone was enough. Now ask yourself: what
@@ -1315,7 +1372,7 @@
         descent, attention, reinforcement learning, chain of thought — is a rung on this ladder. The
         question is not whether we will build each rung. It is whether the ladder has a ceiling.</p>
 
-    <h2 id="sec-quiz">33. Test Your Understanding</h2>
+    <h2 id="sec-quiz">34. Test Your Understanding</h2>
     <p>To truly understand it from first principles, you must build it yourself. Below is a live Python environment.
         Write the code for each core component we discussed. You can use <code>print()</code> to debug your logic—the
         output will appear in the console below.</p>

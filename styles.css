@@ -138,6 +138,7 @@
 
         input[type=range] {
             -webkit-appearance: none;
+            appearance: none;
             width: 150px;
             background: transparent;
             margin-top: 10px;
@@ -394,6 +395,11 @@
         .tag-reasoning {
             color: #fbbf24;
             border-color: #fbbf2433;
+        }
+
+        .tag-alignment {
+            color: #00ff88;
+            border-color: #00ff8833;
         }
 
         .tag-sequence {

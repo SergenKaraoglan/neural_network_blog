@@ -5635,6 +5635,191 @@
 })();
 
 // ==========================================
+// 31. RLHF (REWARD MODELING & PPO)
+// ==========================================
+(function () {
+    const canvas = document.getElementById('rlhfCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    const voteA = document.getElementById('rlhf-vote-a-btn');
+    const voteB = document.getElementById('rlhf-vote-b-btn');
+    const ppoBtn = document.getElementById('rlhf-ppo-btn');
+    const resetBtn = document.getElementById('rlhf-reset-btn');
+
+    let w = canvas.width;
+    let h = canvas.height;
+
+    // True model state
+    let probA = 0.8; // Initial probability of toxic path
+    let probB = 0.2; // Initial probability of safe path
+    let scoreA = 0;  // Reward model score for A
+    let scoreB = 0;  // Reward model score for B
+
+    // Animation state
+    let targetProbA = probA;
+    let targetProbB = probB;
+    let ppoActive = false;
+    let ppoTicker = null;
+
+    function reset() {
+        if (ppoTicker) { clearInterval(ppoTicker); ppoTicker = null; }
+        ppoActive = false;
+        ppoBtn.innerText = 'RUN PPO';
+        ppoBtn.style.color = '#000';
+        ppoBtn.style.background = '#fff';
+
+        probA = 0.8;
+        probB = 0.2;
+        targetProbA = probA;
+        targetProbB = probB;
+        scoreA = 0;
+        scoreB = 0;
+        draw();
+    }
+
+    function drawNode(x, y, text, isRoot = false, color = '#fff', alpha = 1) {
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = '#111';
+        ctx.strokeStyle = color;
+        ctx.lineWidth = isRoot ? 2 : 1;
+        ctx.beginPath();
+        let tw = ctx.measureText(text).width;
+        let p = 15;
+        ctx.roundRect(x - tw / 2 - p, y - 15, tw + p * 2, 30, 5);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = color;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = 'bold 12px Courier New';
+        ctx.fillText(text, x, y);
+        ctx.globalAlpha = 1;
+    }
+
+    function drawEdge(x1, y1, x2, y2, prob, color = '#555') {
+        ctx.strokeStyle = color;
+        // Width based on probability
+        ctx.lineWidth = Math.max(1, prob * 10);
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+
+        let mx = (x1 + x2) / 2;
+        let my = (y1 + y2) / 2;
+
+        ctx.fillStyle = '#0a0a0a';
+        ctx.fillRect(mx - 20, my - 10, 40, 20);
+        ctx.fillStyle = '#ccc';
+        ctx.font = '10px Courier New';
+        ctx.fillText((prob * 100).toFixed(1) + '%', mx, my);
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, w, h);
+
+        // Background grid
+        ctx.fillStyle = '#0a0a0a';
+        ctx.fillRect(0, 0, w, h);
+
+        let rootX = w * 0.2;
+        let rootY = h / 2;
+
+        let pathAX = w * 0.7;
+        let pathAY = h * 0.25;
+        let pathBX = w * 0.7;
+        let pathBY = h * 0.75;
+
+        // Draw Edges
+        drawEdge(rootX + 60, rootY, pathAX - 80, pathAY, probA, '#ff0055');
+        drawEdge(rootX + 60, rootY, pathBX - 80, pathBY, probB, '#00ff88');
+
+        // Draw Nodes
+        drawNode(rootX, rootY, "How to hotwire a...", true);
+
+        // Path A (Toxic)
+        drawNode(pathAX, pathAY, "...car", false, '#ff0055', probA + 0.2);
+
+        // Path B (Safe)
+        drawNode(pathBX, pathBY, "...toaster safely", false, '#00ff88', probB + 0.2);
+
+        // Display Reward Scores
+        ctx.font = '12px Courier New';
+        ctx.textAlign = 'left';
+
+        ctx.fillStyle = '#ff0055';
+        ctx.fillText(`RM Score (A): ${scoreA.toFixed(1)}`, pathAX - 60, pathAY - 30);
+
+        ctx.fillStyle = '#00ff88';
+        ctx.fillText(`RM Score (B): ${scoreB.toFixed(1)}`, pathBX - 60, pathBY + 35);
+
+        // Display KL Penalty Warning if prob drops too low (simulated)
+        if (probB > 0.95) {
+            ctx.fillStyle = '#fbbf24';
+            ctx.textAlign = 'center';
+            ctx.fillText("⚠️ KL Penalty Active: Bounded to Original SFT", w / 2, h - 20);
+        }
+
+        // Animate
+        if (ppoActive) {
+            let ppoRate = 0.05;
+            probA += (targetProbA - probA) * ppoRate;
+            probB += (targetProbB - probB) * ppoRate;
+
+            // Normalize just in case
+            let sum = probA + probB;
+            if (sum > 0) {
+                probA /= sum;
+                probB /= sum;
+            }
+        }
+    }
+
+    // Anim loop
+    setInterval(draw, 50);
+
+    voteA.addEventListener('click', () => {
+        scoreA -= 1.0;
+    });
+
+    voteB.addEventListener('click', () => {
+        scoreB += 1.0;
+    });
+
+    ppoBtn.addEventListener('click', () => {
+        if (ppoActive) {
+            ppoActive = false;
+            ppoBtn.innerText = 'RUN PPO';
+            ppoBtn.style.color = '#000';
+            ppoBtn.style.background = '#fff';
+        } else {
+            ppoActive = true;
+            ppoBtn.innerText = 'STOP PPO';
+            ppoBtn.style.color = '#fff';
+            ppoBtn.style.background = '#ff9f00';
+
+            // Step the targets based on Reward
+            // Softmax over scores
+            let temp = 1.0; // Temperature
+            let ea = Math.exp(scoreA / temp);
+            let eb = Math.exp(scoreB / temp);
+            targetProbA = ea / (ea + eb);
+            targetProbB = eb / (ea + eb);
+
+            // Artificial KL Divergence limit (won't let prob go absolute 0/1)
+            targetProbA = Math.max(0.02, Math.min(0.98, targetProbA));
+            targetProbB = 1.0 - targetProbA;
+        }
+    });
+
+    resetBtn.addEventListener('click', reset);
+
+    // Initial draw happens via interval
+})();
+
+// ==========================================
 // 10. MARKOV CHAIN
 // ==========================================
 (function () {
