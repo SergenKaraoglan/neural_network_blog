@@ -1,5 +1,5 @@
 // ==========================================
-// 0. THE EXPANDING INTRO ANIMATION (Bleuje Style)
+// 0. THE EXPANDING INTRO ANIMATION
 // ==========================================
 (function () {
     const canvas = document.getElementById('introCanvas');
@@ -4230,6 +4230,202 @@
         draw();
     });
 
+    draw();
+})();
+
+// ==========================================
+// 13. exploring the maze (BFS & DFS)
+// ==========================================
+(function () {
+    const canvas = document.getElementById('searchCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const btnBFS = document.getElementById('search-bfs-btn');
+    const btnDFS = document.getElementById('search-dfs-btn');
+    const btnReset = document.getElementById('search-reset-btn');
+
+    const W = canvas.width, H = canvas.height;
+    const COLS = 30, ROWS = 15;
+    const CELL_W = W / COLS, CELL_H = H / ROWS;
+
+    let grid = [];
+    let startCell = { c: 2, r: Math.floor(ROWS / 2) };
+    let targetCell = { c: COLS - 3, r: Math.floor(ROWS / 2) };
+
+    let frontier = []; // Stack for DFS, Queue for BFS
+    let visited = new Set();
+    let cameFrom = new Map();
+    let path = [];
+
+    let isSearching = false;
+    let searchType = null; // 'BFS' or 'DFS'
+    let animId = null;
+
+    function initGrid() {
+        grid = [];
+        for (let r = 0; r < ROWS; r++) {
+            let row = [];
+            for (let c = 0; c < COLS; c++) row.push(0); // 0=empty, 1=wall
+            grid.push(row);
+        }
+
+        // Add random walls
+        for (let i = 0; i < 80; i++) {
+            let r = Math.floor(Math.random() * ROWS);
+            let c = Math.floor(Math.random() * COLS);
+            if ((r === startCell.r && c === startCell.c) || (r === targetCell.r && c === targetCell.c)) continue;
+            grid[r][c] = 1;
+        }
+    }
+
+    function resetSearch() {
+        if (animId) cancelAnimationFrame(animId);
+        frontier = [];
+        visited.clear();
+        cameFrom.clear();
+        path = [];
+        isSearching = false;
+        searchType = null;
+        if (btnBFS) btnBFS.disabled = false;
+        if (btnDFS) btnDFS.disabled = false;
+        draw();
+    }
+
+    function draw() {
+        ctx.fillStyle = '#0f0f0f';
+        ctx.fillRect(0, 0, W, H);
+
+        for (let r = 0; r < ROWS; r++) {
+            for (let c = 0; c < COLS; c++) {
+                let x = c * CELL_W, y = r * CELL_H;
+                const id = r + "," + c;
+
+                if (grid[r][c] === 1) {
+                    ctx.fillStyle = '#333';
+                    ctx.fillRect(x, y, CELL_W - 1, CELL_H - 1);
+                } else if (path.includes(id)) {
+                    ctx.fillStyle = '#ffb703';
+                    ctx.fillRect(x, y, CELL_W - 1, CELL_H - 1);
+                } else if (visited.has(id)) {
+                    ctx.fillStyle = (searchType === 'BFS') ? 'rgba(0, 229, 255, 0.4)' : 'rgba(255, 0, 85, 0.4)';
+                    ctx.fillRect(x, y, CELL_W - 1, CELL_H - 1);
+                } else if (frontier.some(el => el.r === r && el.c === c)) {
+                    ctx.fillStyle = '#fff';
+                    ctx.fillRect(x, y, CELL_W - 1, CELL_H - 1);
+                }
+            }
+        }
+
+        // Draw Start / End
+        ctx.fillStyle = '#00ff00';
+        ctx.fillRect(startCell.c * CELL_W, startCell.r * CELL_H, CELL_W - 1, CELL_H - 1);
+        ctx.fillStyle = '#ff0000';
+        ctx.fillRect(targetCell.c * CELL_W, targetCell.r * CELL_H, CELL_W - 1, CELL_H - 1);
+
+        ctx.fillStyle = '#000';
+        ctx.font = 'bold 12px Courier New';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('S', startCell.c * CELL_W + CELL_W / 2, startCell.r * CELL_H + CELL_H / 2);
+        ctx.fillText('E', targetCell.c * CELL_W + CELL_W / 2, targetCell.r * CELL_H + CELL_H / 2);
+    }
+
+    function getNeighbors(r, c) {
+        let n = [];
+        // Up, Right, Down, Left
+        const dirs = [[-1, 0], [0, 1], [1, 0], [0, -1]];
+        for (let d of dirs) {
+            let nr = r + d[0], nc = c + d[1];
+            if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS && grid[nr][nc] === 0) {
+                n.push({ r: nr, c: nc });
+            }
+        }
+        return n;
+    }
+
+    function stepSearch() {
+        if (frontier.length === 0) {
+            isSearching = false;
+            return;
+        }
+
+        // Take from frontier
+        let current = (searchType === 'BFS') ? frontier.shift() : frontier.pop();
+        let currentId = current.r + "," + current.c;
+
+        if (current.r === targetCell.r && current.c === targetCell.c) {
+            // Found target, reconstruct path
+            let step = currentId;
+            while (step) {
+                path.push(step);
+                step = cameFrom.get(step);
+            }
+            path.reverse();
+            isSearching = false;
+            draw();
+            return;
+        }
+
+        let neighbors = getNeighbors(current.r, current.c);
+
+        // Reverse neighbor order for DFS to make it look nicer visually (right/down bias)
+        if (searchType === 'DFS') neighbors.reverse();
+
+        for (let n of neighbors) {
+            let nid = n.r + "," + n.c;
+            if (!visited.has(nid) && !frontier.some(el => el.r === n.r && el.c === n.c)) {
+                visited.add(nid);
+                cameFrom.set(nid, currentId);
+                frontier.push(n);
+            }
+        }
+
+        draw();
+        if (isSearching) {
+            animId = setTimeout(stepSearch, (searchType === 'BFS') ? 30 : 50);
+        }
+    }
+
+    function startSearch(type) {
+        resetSearch();
+        searchType = type;
+        isSearching = true;
+
+        if (btnBFS) btnBFS.disabled = true;
+        if (btnDFS) btnDFS.disabled = true;
+
+        frontier.push(startCell);
+        visited.add(startCell.r + "," + startCell.c);
+
+        stepSearch();
+    }
+
+    if (btnBFS) btnBFS.addEventListener('click', () => startSearch('BFS'));
+    if (btnDFS) btnDFS.addEventListener('click', () => startSearch('DFS'));
+    if (btnReset) {
+        btnReset.addEventListener('click', () => {
+            initGrid();
+            resetSearch();
+        });
+    }
+
+    // click to toggle walls
+    canvas.addEventListener('mousedown', (e) => {
+        if (isSearching) return;
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        const c = Math.floor(x / CELL_W);
+        const r = Math.floor(y / CELL_H);
+
+        if ((r === startCell.r && c === startCell.c) || (r === targetCell.r && c === targetCell.c)) return;
+
+        if (r >= 0 && r < ROWS && c >= 0 && c < COLS) {
+            grid[r][c] = grid[r][c] === 1 ? 0 : 1;
+            draw();
+        }
+    });
+
+    initGrid();
     draw();
 })();
 

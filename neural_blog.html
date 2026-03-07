@@ -46,7 +46,7 @@
 
         <p class="toc-part">Part I — Fundamentals</p>
         <ol start="1">
-            <li><a href="#sec-linalg">1. The Language of Machines (Linear Algebra)</a></li>
+            <li><a href="#sec-linalg">The Language of Machines (Linear Algebra)</a></li>
             <li><a href="#sec-neuron">A Single Artificial Neuron</a></li>
             <li><a href="#sec-layers">Adding Neurons and Layers</a></li>
             <li><a href="#sec-curves">The Problem of Curves</a></li>
@@ -64,7 +64,7 @@
         </ol>
 
         <p class="toc-part">Part II — Language</p>
-        <ol start="14">
+        <ol start="16">
             <li><a href="#sec-markov">Predicting the Next Step (Markov Chains)</a></li>
             <li><a href="#sec-rnn">Memory and Time (RNNs)</a></li>
             <li><a href="#sec-attention">The Attention Mechanism</a></li>
@@ -74,7 +74,7 @@
         </ol>
 
         <p class="toc-part">Part III — Vision</p>
-        <ol start="20">
+        <ol start="22">
             <li><a href="#sec-cnn">Seeing the World (CNNs)</a></li>
             <li><a href="#sec-genai">Dreaming Machines (GenAI)</a></li>
             <li><a href="#sec-gan">The Art of Forgery (GANs)</a></li>
@@ -84,18 +84,20 @@
         </ol>
 
         <p class="toc-part">Part IV — Reinforcement Learning</p>
-        <ol start="26">
+        <ol start="28">
             <li><a href="#sec-bandits">The Gambler's Dilemma (Multi-Armed Bandits)</a></li>
             <li><a href="#sec-rl">Learning by Doing</a></li>
             <li><a href="#sec-ga">Survival of the Fittest (Genetic Algorithms)</a></li>
             <li><a href="#sec-dqn">The Neural Strategist (Deep Q-Learning)</a></li>
+            <li><a href="#sec-bfs-dfs">Exploring the Maze (BFS &amp; DFS)</a></li>
+            <li><a href="#sec-minimax">Seeing the Future (Minimax)</a></li>
             <li><a href="#sec-mcts">Mastering Games (AlphaZero &amp; MCTS)</a></li>
             <li><a href="#sec-rlhf">Aligning with Humanity (RLHF)</a></li>
             <li><a href="#sec-cot">Thinking Out Loud (Chain of Thought)</a></li>
         </ol>
 
         <p class="toc-part">Closing</p>
-        <ol start="33">
+        <ol start="37">
             <li><a href="#sec-singularity">The Recursive Horizon (The Singularity)</a></li>
             <li><a href="#sec-quiz">Test Your Understanding</a></li>
         </ol>
@@ -123,17 +125,27 @@
 
     <span class="section-tag tag-beginner">BEGINNER</span>
     <h2 id="sec-linalg">1. The Language of Machines (Linear Algebra)</h2>
-    
-    <p>Before we can build an artificial brain, we have to understand the language it speaks. Neural networks do not understand images, words, or sounds. They only understand numbers and the geometric spaces they live in. This is the realm of <strong>Linear Algebra</strong>.</p>
-    
+
+    <p>Before we can build an artificial brain, we have to understand the language it speaks. Neural networks do not
+        understand images, words, or sounds. They only understand numbers and the geometric spaces they live in. This is
+        the realm of <strong>Linear Algebra</strong>.</p>
+
     <p>There are three primary structures you need to know:</p>
     <ul>
-        <li><strong>Scalar</strong>: A single, isolated number. It represents a magnitude, like your age (25), a temperature (98.6), or a pixel's brightness.</li>
-        <li><strong>Vector</strong>: An ordered list of scalars. You can think of a vector in two ways: as a coordinate pointing to a specific location in space (e.g., $[x, y]$), or as an arrow with a direction and length. If we track your age and height, you become a 2D vector: $[25, 180]$. An image is just a massive vector of millions of pixel colors.</li>
-        <li><strong>Matrix</strong>: A 2D grid of numbers. If a vector is a point in space, a matrix is the <em>transformation</em> applied to that space. A matrix can stretch, rotate, or shear vectors. Every layer of a neural network applies a massive matrix transformation to the data.</li>
+        <li><strong>Scalar</strong>: A single, isolated number. It represents a magnitude, like your age (25), a
+            temperature (98.6), or a pixel's brightness.</li>
+        <li><strong>Vector</strong>: An ordered list of scalars. You can think of a vector in two ways: as a coordinate
+            pointing to a specific location in space (e.g., $[x, y]$), or as an arrow with a direction and length. If we
+            track your age and height, you become a 2D vector: $[25, 180]$. An image is just a massive vector of
+            millions of pixel colors.</li>
+        <li><strong>Matrix</strong>: A 2D grid of numbers. If a vector is a point in space, a matrix is the
+            <em>transformation</em> applied to that space. A matrix can stretch, rotate, or shear vectors. Every layer
+            of a neural network applies a massive matrix transformation to the data.</li>
     </ul>
 
-    <p>Let's make this concrete. Below is a 2D coordinate system with a single <strong>Vector</strong> (the blue arrow). We also have a 2x2 <strong>Matrix</strong>. Change the numbers in the matrix below, then click TRANSFORM to see how the matrix mathematically warps space, moving the vector to a new location.</p>
+    <p>Let's make this concrete. Below is a 2D coordinate system with a single <strong>Vector</strong> (the blue arrow).
+        We also have a 2x2 <strong>Matrix</strong>. Change the numbers in the matrix below, then click TRANSFORM to see
+        how the matrix mathematically warps space, moving the vector to a new location.</p>
 
     <div class="interactive-container" style="min-height: 480px; padding-bottom: 2rem;">
         <canvas id="linalgCanvas" width="600" height="350"></canvas>
@@ -141,18 +153,25 @@
             <div style="display: flex; gap: 20px; align-items: center;">
                 <div style="text-align: right; font-family: 'Courier New', monospace; color: #aaa;">
                     <strong>MATRIX</strong><br>
-                    <div style="display:inline-block; border-left:2px solid #fff; border-right:2px solid #fff; padding: 4px; margin-top:5px;">
-                       <input type="number" id="mat-00" value="1.0" step="0.5" style="width:50px; background:#222; color:#fff; border:1px solid #444; padding:2px; text-align:center;"> 
-                       <input type="number" id="mat-01" value="0.5" step="0.5" style="width:50px; background:#222; color:#fff; border:1px solid #444; padding:2px; text-align:center;"><br>
-                       <input type="number" id="mat-10" value="-0.5" step="0.5" style="width:50px; background:#222; color:#fff; border:1px solid #444; padding:2px; text-align:center; margin-top:4px;"> 
-                       <input type="number" id="mat-11" value="1.0" step="0.5" style="width:50px; background:#222; color:#fff; border:1px solid #444; padding:2px; text-align:center; margin-top:4px;">
+                    <div
+                        style="display:inline-block; border-left:2px solid #fff; border-right:2px solid #fff; padding: 4px; margin-top:5px;">
+                        <input type="number" id="mat-00" value="1.0" step="0.5"
+                            style="width:50px; background:#222; color:#fff; border:1px solid #444; padding:2px; text-align:center;">
+                        <input type="number" id="mat-01" value="0.5" step="0.5"
+                            style="width:50px; background:#222; color:#fff; border:1px solid #444; padding:2px; text-align:center;"><br>
+                        <input type="number" id="mat-10" value="-0.5" step="0.5"
+                            style="width:50px; background:#222; color:#fff; border:1px solid #444; padding:2px; text-align:center; margin-top:4px;">
+                        <input type="number" id="mat-11" value="1.0" step="0.5"
+                            style="width:50px; background:#222; color:#fff; border:1px solid #444; padding:2px; text-align:center; margin-top:4px;">
                     </div>
                 </div>
                 <div style="text-align: left; font-family: 'Courier New', monospace; color: #00e5ff;">
                     <strong>VECTOR</strong><br>
-                    <div style="display:inline-block; border-left:2px solid #00e5ff; border-right:2px solid #00e5ff; padding: 4px; margin-top:5px;">
-                       <span id="vec-x" style="display:inline-block; width:50px; text-align:center;">1.0</span><br>
-                       <span id="vec-y" style="display:inline-block; width:50px; text-align:center; margin-top:4px;">1.0</span>
+                    <div
+                        style="display:inline-block; border-left:2px solid #00e5ff; border-right:2px solid #00e5ff; padding: 4px; margin-top:5px;">
+                        <span id="vec-x" style="display:inline-block; width:50px; text-align:center;">1.0</span><br>
+                        <span id="vec-y"
+                            style="display:inline-block; width:50px; text-align:center; margin-top:4px;">1.0</span>
                     </div>
                 </div>
             </div>
@@ -161,8 +180,10 @@
                 <button id="linalg-reset-btn" style="background:#333; color:#fff;">RESET</button>
             </div>
         </div>
-        <p style="font-size: 0.9rem; color: #888; text-align: center; margin-top: 1rem; font-family: 'Courier New', monospace;">
-            Drag the head of the vector to move it. The Matrix multiplies against the Vector. This spatial transformation is the foundational operation of every neural network.
+        <p
+            style="font-size: 0.9rem; color: #888; text-align: center; margin-top: 1rem; font-family: 'Courier New', monospace;">
+            Drag the head of the vector to move it. The Matrix multiplies against the Vector. This spatial
+            transformation is the foundational operation of every neural network.
         </p>
     </div>
 
@@ -416,18 +437,24 @@
         </p>
     </div>
 
-    
+
     <span class="section-tag tag-beginner">BEGINNER</span>
     <h2 id="sec-kmeans">10. Finding the Groups (K-Means Clustering)</h2>
-    <p>We've talked about drawing boundaries to separate apples from lemons when we already know the answer (Supervised Learning). But what if you are handed a massive dataset of customer behavior, or galaxies, and you don't know the categories in advance? You just want the machine to find the natural groups.</p>
-    
-    <p>This is <strong>Unsupervised Learning</strong>, and the most famous algorithm to do it is <strong>K-Means Clustering</strong>.</p>
-    
+    <p>We've talked about drawing boundaries to separate apples from lemons when we already know the answer (Supervised
+        Learning). But what if you are handed a massive dataset of customer behavior, or galaxies, and you don't know
+        the categories in advance? You just want the machine to find the natural groups.</p>
+
+    <p>This is <strong>Unsupervised Learning</strong>, and the most famous algorithm to do it is <strong>K-Means
+            Clustering</strong>.</p>
+
     <p>The algorithm is elegantly simple:
-    <br>1. <strong>Initialize</strong>: Drop <em>K</em> random center points (centroids) into the data.
-    <br>2. <strong>Assign</strong>: Every data point looks at all the centroids and colors itself to match the closest one.
-    <br>3. <strong>Move</strong>: Each centroid looks at all its matching points and moves to their exact center (the mean).
-    <br>Repeat steps 2 and 3 until the centroids stop moving.</p>
+        <br>1. <strong>Initialize</strong>: Drop <em>K</em> random center points (centroids) into the data.
+        <br>2. <strong>Assign</strong>: Every data point looks at all the centroids and colors itself to match the
+        closest one.
+        <br>3. <strong>Move</strong>: Each centroid looks at all its matching points and moves to their exact center
+        (the mean).
+        <br>Repeat steps 2 and 3 until the centroids stop moving.
+    </p>
 
     <div class="interactive-container" style="min-height: 480px; padding-bottom: 2rem;">
         <canvas id="kmeansCanvas" width="600" height="350"></canvas>
@@ -437,11 +464,14 @@
                 <input type="range" id="kmeans-k-slider" min="2" max="6" step="1" value="3" style="width: 140px;">
             </div>
             <button id="kmeans-step-btn">STEP (ASSIGN & MOVE)</button>
-            <button id="kmeans-auto-btn" style="background:#222; color:#00e5ff; border: 1px solid #00e5ff;">AUTO-CLUSTER</button>
+            <button id="kmeans-auto-btn"
+                style="background:#222; color:#00e5ff; border: 1px solid #00e5ff;">AUTO-CLUSTER</button>
             <button id="kmeans-reset-btn" style="background:#333; color:#fff;">RESET</button>
         </div>
-        <p style="font-size: 0.9rem; color: #888; text-align: center; margin-top: 1rem; font-family: 'Courier New', monospace;">
-            Try changing K to match the obvious groups in the data. Click STEP to watch the algorithm organically discover the clusters without any human labels.
+        <p
+            style="font-size: 0.9rem; color: #888; text-align: center; margin-top: 1rem; font-family: 'Courier New', monospace;">
+            Try changing K to match the obvious groups in the data. Click STEP to watch the algorithm organically
+            discover the clusters without any human labels.
         </p>
     </div>
 
@@ -1247,14 +1277,56 @@
     </p>
 
     <span class="section-tag tag-advanced">ADVANCED</span>
-    <h2 id="sec-minimax">32. Seeing the Future (Minimax)</h2>
-    
-    <p>We know how an AI can learn a strategy through trial and error (Reinforcement Learning), but classical game-playing AI didn't learn—it <em>searched</em>. If you define every possible legal move in a game, you create a massive "Game Tree".</p>
-    
-    <p>To find the best move, we use the <strong>Minimax</strong> algorithm. It assumes both players play perfectly. You are the Maximizer (trying to get the highest score, e.g., +1 for a win), and your opponent is the Minimizer (trying to force the lowest score, e.g., -1 for your loss).</p>
-    
-    <p>The algorithm reaches all the way to the end of the game (the "leaf nodes"), scores the board, and then bubbles those scores back up the tree. At every turn, the Maximizer picks the branch with the highest guaranteed score, while the Minimizer picks the branch with the lowest guaranteed score.</p>
-    
+    <h2 id="sec-bfs-dfs">32. Exploring the Maze (BFS & DFS)</h2>
+
+    <p>Before an AI can evaluate the quality of future paths, it must first know <em>how</em> to explore them. The
+        algorithmic capability to search through possible states—whether it's moves on a chessboard or intersecting
+        streets on a map—is foundational. Two classical strategies govern this exploration.</p>
+
+    <ul>
+        <li><strong>Breadth-First Search (BFS)</strong>: Spreads outward equally in all directions, exploring all
+            immediate neighbors before moving deeper. Imagine dropping a stone in a pond and watching the ripples
+            expand. It guarantees finding the <em>shortest path</em> to the target, but consumes massive memory because
+            it must remember the entire expanding frontier.</li>
+        <li><strong>Depth-First Search (DFS)</strong>: Picks a single path and plunges down it as far as possible until
+            it hits a dead end. Then, it backtracks to the last fork and tries another route. Imagine a mouse solving a
+            maze by keeping its hand on the right wall. It uses very little memory, but can waste time exploring deep,
+            irrelevant paths and does not guarantee the shortest route.</li>
+    </ul>
+
+    <div class="interactive-container" style="min-height: 480px; padding-bottom: 2rem;">
+        <canvas id="searchCanvas" width="600" height="350"
+            style="background:#0f0f0f; border:1px solid #333; cursor:crosshair;"></canvas>
+        <div class="controls" style="flex-direction: column; align-items: center; gap: 15px; margin-top:15px;">
+            <div style="display: flex; gap: 10px;">
+                <button id="search-bfs-btn" style="background:#00e5ff; color:#000;">RUN BFS</button>
+                <button id="search-dfs-btn" style="background:#ffb703; color:#000;">RUN DFS</button>
+                <button id="search-reset-btn" style="background:#333; color:#fff;">RESET MAZE</button>
+            </div>
+        </div>
+        <p
+            style="font-size: 0.9rem; color: #888; text-align: center; margin-top: 1rem; font-family: 'Courier New', monospace;">
+            Click <strong>RUN BFS</strong> to watch the search expand symmetrically. Click <strong>RUN DFS</strong> to
+            watch the computer relentlessly plunge down single corridors. Click on the canvas to draw or erase your own
+            walls!
+        </p>
+    </div>
+
+    <span class="section-tag tag-advanced">ADVANCED</span>
+    <h2 id="sec-minimax">33. Seeing the Future (Minimax)</h2>
+
+    <p>We know how an AI can learn a strategy through trial and error (Reinforcement Learning), but classical
+        game-playing AI didn't learn—it <em>searched</em>. If you define every possible legal move in a game, you create
+        a massive "Game Tree".</p>
+
+    <p>To find the best move, we use the <strong>Minimax</strong> algorithm. It assumes both players play perfectly. You
+        are the Maximizer (trying to get the highest score, e.g., +1 for a win), and your opponent is the Minimizer
+        (trying to force the lowest score, e.g., -1 for your loss).</p>
+
+    <p>The algorithm reaches all the way to the end of the game (the "leaf nodes"), scores the board, and then bubbles
+        those scores back up the tree. At every turn, the Maximizer picks the branch with the highest guaranteed score,
+        while the Minimizer picks the branch with the lowest guaranteed score.</p>
+
     <div class="interactive-container" style="min-height: 480px; padding-bottom: 2rem;">
         <canvas id="minimaxCanvas" width="600" height="350"></canvas>
         <div class="controls" style="flex-direction: column; align-items: center; gap: 15px;">
@@ -1263,15 +1335,20 @@
                 <button id="minimax-reset-btn" style="background:#333; color:#fff;">RESET</button>
             </div>
         </div>
-        <p style="font-size: 0.9rem; color: #888; text-align: center; margin-top: 1rem; font-family: 'Courier New', monospace;">
-            Click STEP to see how the terminal leaf values bubble up dynamically. The Minimizer (square nodes) will always pull up the lowest value from its children, while the Maximizer (circle nodes) will pull up the highest value.
+        <p
+            style="font-size: 0.9rem; color: #888; text-align: center; margin-top: 1rem; font-family: 'Courier New', monospace;">
+            Click STEP to see how the terminal leaf values bubble up dynamically. The Minimizer (square nodes) will
+            always pull up the lowest value from its children, while the Maximizer (circle nodes) will pull up the
+            highest value.
         </p>
     </div>
 
-    <p>Minimax perfectly solves simple games like Tic-Tac-Toe. However, the game tree for Chess has $10^{40}$ nodes, and Go has $10^{170}$—more than the atoms in the universe. It is physically impossible to search to the end of these games using Minimax alone.</p>
+    <p>Minimax perfectly solves simple games like Tic-Tac-Toe. However, the game tree for Chess has $10^{40}$ nodes, and
+        Go has $10^{170}$—more than the atoms in the universe. It is physically impossible to search to the end of these
+        games using Minimax alone.</p>
 
     <span class="section-tag tag-advanced">ADVANCED</span>
-    <h2 id="sec-mcts">33. Mastering Games (AlphaZero & MCTS)</h2>
+    <h2 id="sec-mcts">34. Mastering Games (AlphaZero & MCTS)</h2>
     <p>Deep Q-Networks learn to play games by trial and error, but there's a fundamentally different approach:
         <strong>planning ahead</strong>. When a chess grandmaster considers a move, they don't just react to the
         current board—they simulate future sequences of play, evaluating which paths lead to victory. This is
@@ -1309,7 +1386,7 @@
         All from pure self-play, guided by search and a neural network working in concert.</p>
 
     <span class="section-tag tag-alignment">ALIGNMENT</span>
-    <h2 id="sec-rlhf">34. Aligning with Humanity (RLHF)</h2>
+    <h2 id="sec-rlhf">35. Aligning with Humanity (RLHF)</h2>
     <p>A raw Language Model is a statistical mirror. It has read the entire internet, and its only goal is to predict
         the most likely next word. If prompted with <em>"How to steal a..."</em>, a raw model doesn't understand
         morality; it simply knows that the internet frequently follows that phrase with <em>"car"</em>. It assigns a
@@ -1364,7 +1441,7 @@
         RLHF to pure autonomous reasoning—which leads us directly to Chain of Thought.</p>
 
     <span class="section-tag tag-reasoning">REASONING</span>
-    <h2 id="sec-cot">35. Thinking Out Loud (Chain of Thought)</h2>
+    <h2 id="sec-cot">36. Thinking Out Loud (Chain of Thought)</h2>
     <p>Every technique we have built so far—self-supervised pre-training, attention, MCTS—produces
         models that answer <em>instantly</em>. One forward pass, one prediction. For simple questions
         this works beautifully. But ask a model to solve a hard math problem like <span class="equation">17 × 24</span>,
@@ -1420,7 +1497,7 @@
     </p>
 
     <span class="section-tag">PHILOSOPHY</span>
-    <h2 id="sec-singularity">36. The Recursive Horizon (The Singularity)</h2>
+    <h2 id="sec-singularity">37. The Recursive Horizon (The Singularity)</h2>
     <p>We have just witnessed something unsettling. A model trained with reinforcement learning
         <em>spontaneously invented self-correction</em> — it learned to doubt itself, to backtrack, to
         think harder. Nobody told it to do this. The reward signal alone was enough. Now ask yourself: what
@@ -1473,7 +1550,7 @@
         descent, attention, reinforcement learning, chain of thought — is a rung on this ladder. The
         question is not whether we will build each rung. It is whether the ladder has a ceiling.</p>
 
-    <h2 id="sec-quiz">37. Test Your Understanding</h2>
+    <h2 id="sec-quiz">38. Test Your Understanding</h2>
     <p>To truly understand it from first principles, you must build it yourself. Below is a live Python environment.
         Write the code for each core component we discussed. You can use <code>print()</code> to debug your logic—the
         output will appear in the console below.</p>
