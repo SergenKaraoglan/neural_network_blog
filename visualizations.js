@@ -152,6 +152,216 @@
 })();
 
 // ==========================================
+// 1. THE LANGUAGE OF MACHINES (LINEAR ALGEBRA)
+// ==========================================
+(function () {
+    const canvas = document.getElementById('linalgCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    const mat00 = document.getElementById('mat-00');
+    const mat01 = document.getElementById('mat-01');
+    const mat10 = document.getElementById('mat-10');
+    const mat11 = document.getElementById('mat-11');
+    const vecXSpan = document.getElementById('vec-x');
+    const vecYSpan = document.getElementById('vec-y');
+    const transformBtn = document.getElementById('linalg-transform-btn');
+    const resetBtn = document.getElementById('linalg-reset-btn');
+
+    let W = canvas.width;
+    let H = canvas.height;
+    const origin = { x: W / 2, y: H / 2 };
+    const scale = 40; // pixels per unit
+
+    let vec = { x: 1, y: 1 };
+    let targetVec = null;
+    let animProgress = 0;
+    let isAnimating = false;
+    let isDragging = false;
+
+    function drawGrid() {
+        ctx.strokeStyle = '#333';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (let x = origin.x % scale; x < W; x += scale) {
+            ctx.moveTo(x, 0); ctx.lineTo(x, H);
+        }
+        for (let y = origin.y % scale; y < H; y += scale) {
+            ctx.moveTo(0, y); ctx.lineTo(W, y);
+        }
+        ctx.stroke();
+
+        ctx.strokeStyle = '#666';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(origin.x, 0); ctx.lineTo(origin.x, H);
+        ctx.moveTo(0, origin.y); ctx.lineTo(W, origin.y);
+        ctx.stroke();
+    }
+
+    function drawArrow(vx, vy, color, alpha = 1.0) {
+        let px = origin.x + vx * scale;
+        let py = origin.y - vy * scale;
+
+        ctx.globalAlpha = alpha;
+        ctx.strokeStyle = color;
+        ctx.fillStyle = color;
+        ctx.lineWidth = 3;
+
+        ctx.beginPath();
+        ctx.moveTo(origin.x, origin.y);
+        ctx.lineTo(px, py);
+        ctx.stroke();
+
+        let angle = Math.atan2(origin.y - py, origin.x - px);
+        ctx.beginPath();
+        ctx.moveTo(px, py);
+        ctx.lineTo(px + 10 * Math.cos(angle - Math.PI / 6), py - 10 * Math.sin(angle - Math.PI / 6));
+        ctx.lineTo(px + 10 * Math.cos(angle + Math.PI / 6), py - 10 * Math.sin(angle + Math.PI / 6));
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(px, py, 6, 0, Math.PI * 2);
+        ctx.fillStyle = '#fff';
+        ctx.fill();
+        ctx.globalAlpha = 1.0;
+    }
+
+    function draw() {
+        ctx.fillStyle = '#0f0f0f';
+        ctx.fillRect(0, 0, W, H);
+        drawGrid();
+
+        if (isAnimating) {
+            drawArrow(vec.x, vec.y, '#444');
+
+            let curX = vec.x + (targetVec.x - vec.x) * easeInOutQuad(animProgress);
+            let curY = vec.y + (targetVec.y - vec.y) * easeInOutQuad(animProgress);
+
+            ctx.save();
+            ctx.translate(origin.x, origin.y);
+            let m00 = 1 + (parseFloat(mat00.value) - 1) * easeInOutQuad(animProgress);
+            let m01 = 0 + parseFloat(mat01.value) * easeInOutQuad(animProgress);
+            let m10 = 0 + parseFloat(mat10.value) * easeInOutQuad(animProgress);
+            let m11 = 1 + (parseFloat(mat11.value) - 1) * easeInOutQuad(animProgress);
+            ctx.transform(m00, -m10, -m01, m11, 0, 0);
+
+            ctx.strokeStyle = 'rgba(0, 229, 255, 0.2)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            for (let x = -W; x < W * 2; x += scale) {
+                ctx.moveTo(x, -H * 2); ctx.lineTo(x, H * 2);
+            }
+            for (let y = -H; y < H * 2; y += scale) {
+                ctx.moveTo(-W * 2, y); ctx.lineTo(W * 2, y);
+            }
+            ctx.stroke();
+            ctx.restore();
+
+            drawArrow(curX, curY, '#00e5ff');
+
+            vecXSpan.innerText = curX.toFixed(2);
+            vecYSpan.innerText = curY.toFixed(2);
+        } else {
+            drawArrow(vec.x, vec.y, '#00e5ff');
+            vecXSpan.innerText = vec.x.toFixed(2);
+            vecYSpan.innerText = vec.y.toFixed(2);
+        }
+    }
+
+    function easeInOutQuad(t) {
+        return t < .5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+    }
+
+    function animate() {
+        if (!isAnimating) return;
+        animProgress += 0.02;
+        if (animProgress >= 1.0) {
+            isAnimating = false;
+            animProgress = 1.0;
+            vec.x = targetVec.x;
+            vec.y = targetVec.y;
+            transformBtn.innerText = "TRANSFORM VECTOR";
+            transformBtn.disabled = false;
+        }
+        draw();
+        if (isAnimating) requestAnimationFrame(animate);
+    }
+
+    if (transformBtn) {
+        transformBtn.addEventListener('click', () => {
+            if (isAnimating) return;
+            let m00 = parseFloat(mat00.value) || 1;
+            let m01 = parseFloat(mat01.value) || 0;
+            let m10 = parseFloat(mat10.value) || 0;
+            let m11 = parseFloat(mat11.value) || 1;
+
+            targetVec = {
+                x: m00 * vec.x + m01 * vec.y,
+                y: m10 * vec.x + m11 * vec.y
+            };
+
+            isAnimating = true;
+            animProgress = 0;
+            transformBtn.innerText = "TRANSFORMING...";
+            transformBtn.disabled = true;
+            animate();
+        });
+    }
+
+    if (resetBtn) {
+        resetBtn.addEventListener('click', () => {
+            vec = { x: 1, y: 1 };
+            mat00.value = 1.0; mat01.value = 0.5;
+            mat10.value = -0.5; mat11.value = 1.0;
+            targetVec = null;
+            animProgress = 0;
+            isAnimating = false;
+            transformBtn.innerText = "TRANSFORM VECTOR";
+            transformBtn.disabled = false;
+            draw();
+        });
+    }
+
+    function getMousePos(e) {
+        const rect = canvas.getBoundingClientRect();
+        return {
+            x: e.clientX - rect.left,
+            y: e.clientY - rect.top
+        };
+    }
+
+    canvas.addEventListener('mousedown', (e) => {
+        if (isAnimating) return;
+        const pos = getMousePos(e);
+        let px = origin.x + vec.x * scale;
+        let py = origin.y - vec.y * scale;
+        if (Math.hypot(pos.x - px, pos.y - py) < 15) {
+            isDragging = true;
+        }
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        const pos = getMousePos(e);
+        vec.x = (pos.x - origin.x) / scale;
+        vec.y = (origin.y - pos.y) / scale;
+        vec.x = Math.round(vec.x * 2) / 2; // snap to 0.5
+        vec.y = Math.round(vec.y * 2) / 2;
+        draw();
+    });
+
+    canvas.addEventListener('mouseup', () => isDragging = false);
+    canvas.addEventListener('mouseleave', () => isDragging = false);
+
+    [mat00, mat01, mat10, mat11].forEach(inp => {
+        if (inp) inp.addEventListener('input', draw);
+    });
+
+    draw();
+})();
+
+// ==========================================
 // 2. ADDING NEURONS AND LAYERS (POLYGON)
 // ==========================================
 (function () {
@@ -1450,6 +1660,196 @@
     generateData();
     initTree();
     draw();
+})();
+
+// ==========================================
+// 8.5 FINDING THE GROUPS (K-MEANS CLUSTERING)
+// ==========================================
+(function () {
+    const canvas = document.getElementById('kmeansCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const stepBtn = document.getElementById('kmeans-step-btn');
+    const autoBtn = document.getElementById('kmeans-auto-btn');
+    const resetBtn = document.getElementById('kmeans-reset-btn');
+    const kSlider = document.getElementById('kmeans-k-slider');
+    const kVal = document.getElementById('kmeans-k-val');
+
+    const W = canvas.width, H = canvas.height;
+    let points = [];
+    let centroids = [];
+    let state = 'ASSIGN'; // ASSIGN or MOVE
+    let autoTimer = null;
+    let K = 3;
+
+    // Palette for clusters
+    const colors = ['#00e5ff', '#ff0055', '#a855f7', '#ffb703', '#38bdf8', '#10b981'];
+
+    function initData() {
+        points = [];
+        // Generate a few blobs
+        const numBlobs = Math.floor(Math.random() * 3) + 3; // 3 to 5 blobs naturally
+        for (let b = 0; b < numBlobs; b++) {
+            let cx = 100 + Math.random() * (W - 200);
+            let cy = 100 + Math.random() * (H - 200);
+            for (let i = 0; i < 40; i++) {
+                points.push({
+                    x: cx + (Math.random() - 0.5) * 80 + (Math.random() - 0.5) * 80,
+                    y: cy + (Math.random() - 0.5) * 80 + (Math.random() - 0.5) * 80,
+                    cluster: -1
+                });
+            }
+        }
+    }
+
+    function initCentroids() {
+        centroids = [];
+        for (let i = 0; i < K; i++) {
+            // Random points from dataset
+            let pick = points[Math.floor(Math.random() * points.length)];
+            centroids.push({ x: pick.x, y: pick.y, color: colors[i % colors.length] });
+        }
+    }
+
+    function assignPoints() {
+        let changed = false;
+        for (let p of points) {
+            let bestDist = Infinity;
+            let bestC = -1;
+            for (let i = 0; i < centroids.length; i++) {
+                let dx = p.x - centroids[i].x;
+                let dy = p.y - centroids[i].y;
+                let dist = dx * dx + dy * dy;
+                if (dist < bestDist) {
+                    bestDist = dist;
+                    bestC = i;
+                }
+            }
+            if (p.cluster !== bestC) {
+                p.cluster = bestC;
+                changed = true;
+            }
+        }
+        return changed; // If false, we've converged (during ASSIGN step)
+    }
+
+    function moveCentroids() {
+        let sums = new Array(K).fill(0).map(() => ({ x: 0, y: 0, count: 0 }));
+        for (let p of points) {
+            if (p.cluster !== -1) {
+                sums[p.cluster].x += p.x;
+                sums[p.cluster].y += p.y;
+                sums[p.cluster].count++;
+            }
+        }
+
+        let moved = false;
+        for (let i = 0; i < K; i++) {
+            if (sums[i].count > 0) {
+                let nx = sums[i].x / sums[i].count;
+                let ny = sums[i].y / sums[i].count;
+                // Move with a little easing for animation, or jump directly.
+                // We will jump directly to show exact step.
+                if (Math.abs(centroids[i].x - nx) > 0.1 || Math.abs(centroids[i].y - ny) > 0.1) moved = true;
+                centroids[i].x = nx;
+                centroids[i].y = ny;
+            }
+        }
+        return moved;
+    }
+
+    function step() {
+        if (state === 'ASSIGN') {
+            let changed = assignPoints();
+            state = 'MOVE';
+            stepBtn.innerText = 'STEP (MOVE CENTROIDS)';
+            if (!changed) {
+                stepBtn.innerText = 'CONVERGED!';
+                stopAuto();
+            }
+        } else {
+            let moved = moveCentroids();
+            state = 'ASSIGN';
+            stepBtn.innerText = 'STEP (ASSIGN POINTS)';
+            if (!moved) {
+                stepBtn.innerText = 'CONVERGED!';
+                stopAuto();
+            }
+        }
+        draw();
+    }
+
+    function draw() {
+        ctx.fillStyle = '#0f0f0f';
+        ctx.fillRect(0, 0, W, H);
+
+        for (let p of points) {
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+            ctx.fillStyle = p.cluster === -1 ? '#555' : centroids[p.cluster].color;
+            ctx.globalAlpha = 0.6;
+            ctx.fill();
+            ctx.globalAlpha = 1.0;
+        }
+
+        for (let c of centroids) {
+            ctx.beginPath();
+            let r = 8;
+            ctx.moveTo(c.x - r, c.y - r);
+            ctx.lineTo(c.x + r, c.y + r);
+            ctx.moveTo(c.x + r, c.y - r);
+            ctx.lineTo(c.x - r, c.y + r);
+            ctx.strokeStyle = c.color;
+            ctx.lineWidth = 4;
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.arc(c.x, c.y, 10, 0, Math.PI * 2);
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        }
+    }
+
+    function reset() {
+        stopAuto();
+        K = parseInt(kSlider.value);
+        initData();
+        initCentroids();
+        state = 'ASSIGN';
+        stepBtn.innerText = 'STEP (ASSIGN & MOVE)';
+        draw();
+    }
+
+    function startAuto() {
+        if (autoTimer) stopAuto();
+        autoBtn.innerText = 'STOP';
+        autoBtn.style.color = '#ff0055';
+        autoTimer = setInterval(() => {
+            step();
+            if (stepBtn.innerText === 'CONVERGED!') stopAuto();
+        }, 500);
+    }
+
+    function stopAuto() {
+        if (autoTimer) clearInterval(autoTimer);
+        autoTimer = null;
+        autoBtn.innerText = 'AUTO-CLUSTER';
+        autoBtn.style.color = '#00e5ff';
+    }
+
+    stepBtn.addEventListener('click', () => { stopAuto(); step(); });
+    autoBtn.addEventListener('click', () => {
+        if (autoTimer) stopAuto();
+        else startAuto();
+    });
+    resetBtn.addEventListener('click', reset);
+    kSlider.addEventListener('input', (e) => {
+        kVal.innerText = e.target.value;
+        reset();
+    });
+
+    reset();
 })();
 
 // ==========================================
