@@ -5550,6 +5550,91 @@
 })();
 
 // ==========================================
+// 25. DISENTANGLED REPRESENTATIONS
+// ==========================================
+(function () {
+    const canvas = document.getElementById('disentangleCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    const sizeSlider = document.getElementById('dis-size-slider');
+    const rotSlider = document.getElementById('dis-rot-slider');
+    const colSlider = document.getElementById('dis-col-slider');
+    const shapeSlider = document.getElementById('dis-shape-slider');
+
+    const sizeVal = document.getElementById('dis-size-val');
+    const rotVal = document.getElementById('dis-rot-val');
+    const colVal = document.getElementById('dis-col-val');
+    const shapeVal = document.getElementById('dis-shape-val');
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Grid background
+        ctx.fillStyle = '#0a0a0a';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.strokeStyle = '#1a1a1a';
+        ctx.lineWidth = 1;
+        for (let i = 0; i < canvas.width; i += 40) {
+            ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke();
+        }
+        for (let i = 0; i < canvas.height; i += 40) {
+            ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(canvas.width, i); ctx.stroke();
+        }
+
+        const size = parseFloat(sizeSlider.value);
+        const rot = parseFloat(rotSlider.value) * Math.PI / 180;
+        const hue = parseFloat(colSlider.value);
+        const shape = parseFloat(shapeSlider.value) / 100.0; // 0 = Square, 1 = Circle
+
+        sizeVal.innerText = size.toFixed(0);
+        rotVal.innerText = rotSlider.value + '°';
+        colVal.innerText = hue.toFixed(0) + '°';
+        shapeVal.innerText = shapeSlider.value + '%';
+
+        const cx = canvas.width / 2;
+        const cy = canvas.height / 2;
+
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(rot);
+
+        ctx.beginPath();
+        const steps = 60;
+        for (let i = 0; i <= steps; i++) {
+            let theta = (i / steps) * Math.PI * 2;
+            let cosT = Math.cos(theta);
+            let sinT = Math.sin(theta);
+
+            // Morph between square (roundness=0, p=0.5) and circle (roundness=1, p=1.0)
+            let x = Math.sign(cosT) * Math.pow(Math.abs(cosT), 0.5 + 0.5 * shape) * size;
+            let y = Math.sign(sinT) * Math.pow(Math.abs(sinT), 0.5 + 0.5 * shape) * size;
+
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+
+        ctx.fillStyle = `hsl(${hue}, 80%, 50%)`;
+        ctx.shadowColor = `hsl(${hue}, 80%, 50%)`;
+        ctx.shadowBlur = 15;
+        ctx.fill();
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = '#fff';
+        ctx.shadowBlur = 0;
+        ctx.stroke();
+
+        ctx.restore();
+    }
+
+    [sizeSlider, rotSlider, colSlider, shapeSlider].forEach(el => {
+        el.addEventListener('input', draw);
+    });
+
+    draw();
+})();
+
+// ==========================================
 // 10. MARKOV CHAIN
 // ==========================================
 (function () {

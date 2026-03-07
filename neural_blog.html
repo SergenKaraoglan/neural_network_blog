@@ -78,10 +78,11 @@
             <li><a href="#sec-gan">The Art of Forgery (GANs)</a></li>
             <li><a href="#sec-vae">Compressing Reality (VAEs)</a></li>
             <li><a href="#sec-latent">The Space Between (Manifolds)</a></li>
+            <li><a href="#sec-disentanglement">Untangling the Threads (Disentanglement)</a></li>
         </ol>
 
         <p class="toc-part">Part IV — Reinforcement Learning</p>
-        <ol start="25">
+        <ol start="26">
             <li><a href="#sec-bandits">The Gambler's Dilemma (Multi-Armed Bandits)</a></li>
             <li><a href="#sec-rl">Learning by Doing</a></li>
             <li><a href="#sec-ga">Survival of the Fittest (Genetic Algorithms)</a></li>
@@ -91,7 +92,7 @@
         </ol>
 
         <p class="toc-part">Closing</p>
-        <ol start="31">
+        <ol start="32">
             <li><a href="#sec-singularity">The Recursive Horizon (The Singularity)</a></li>
             <li><a href="#sec-quiz">Test Your Understanding</a></li>
         </ol>
@@ -955,13 +956,52 @@
         smooth, logical transition in the generated output, blending discrete concepts together.
     </p>
 
+    <span class="section-tag tag-advanced">ADVANCED</span>
+    <h2 id="sec-disentanglement">25. Untangling the Threads (Disentanglement)</h2>
+    <p>A beautiful consequence of Latent Spaces is that we can sometimes enforce <em>structure</em> onto them. By
+        default, an Autoencoder might compress a face into a small vector of numbers, but those numbers are deeply
+        entangled. Changing number #4 might make the hair longer, the smile wider, and the lighting darker all at once.
+        The network found <em>a</em> compression, but not necessarily a human-interpretable one.</p>
+
+    <p>The quest for <strong>Disentangled Representations</strong> (like in the &beta;-VAE) tries to force the network
+        to allocate exactly one latent dimension to exactly one independent concept. If successful, one knob controls
+        <em>only</em> size, another controls <em>only</em> shape, and a third controls <em>only</em> color.</p>
+
+    <div class="interactive-container" style="min-height: 480px; padding-bottom: 2rem;">
+        <canvas id="disentangleCanvas" width="600" height="300"></canvas>
+        <div class="controls controls-grid"
+            style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; width: 100%; max-width: 500px; margin-top: 1rem;">
+            <div class="slider-group">
+                <label>SIZE: <span id="dis-size-val">80</span></label>
+                <input type="range" id="dis-size-slider" min="20" max="140" step="1" value="80" style="width: 100%;">
+            </div>
+            <div class="slider-group">
+                <label>ROTATION: <span id="dis-rot-val">0°</span></label>
+                <input type="range" id="dis-rot-slider" min="-180" max="180" step="1" value="0" style="width: 100%;">
+            </div>
+            <div class="slider-group">
+                <label>COLOR: <span id="dis-col-val">CYAN</span></label>
+                <input type="range" id="dis-col-slider" min="0" max="360" step="1" value="180" style="width: 100%;">
+            </div>
+            <div class="slider-group">
+                <label>SHAPE (Sq-&gt;Circ): <span id="dis-shape-val">0%</span></label>
+                <input type="range" id="dis-shape-slider" min="0" max="100" step="1" value="0" style="width: 100%;">
+            </div>
+        </div>
+        <p
+            style="font-size: 0.9rem; color: #888; text-align: center; margin-top: 1rem; font-family: 'Courier New', monospace;">
+            A perfectly disentangled latent space. Each slider controls one independent factor of variation.
+            In entangled networks, moving one slider would unpredictably alter multiple factors.
+        </p>
+    </div>
+
     <div class="part-header" id="part-rl">
         <h3>Part IV</h3>
         <p>Reinforcement Learning</p>
     </div>
 
     <span class="section-tag tag-advanced">ADVANCED</span>
-    <h2 id="sec-bandits">25. The Gambler's Dilemma (Multi-Armed Bandits)</h2>
+    <h2 id="sec-bandits">26. The Gambler's Dilemma (Multi-Armed Bandits)</h2>
     <p>Before we teach an agent to navigate environments and plan ahead, there is a simpler, more
         fundamental problem. Imagine you are standing in front of a row of slot machines. Each machine
         has a different, unknown probability of paying out. You have a limited number of pulls. How do
@@ -1005,7 +1045,7 @@
         to the bandit framework, we get the full RL problem.</p>
 
     <span class="section-tag tag-advanced">ADVANCED</span>
-    <h2 id="sec-rl">26. Learning by Doing (Reinforcement Learning)</h2>
+    <h2 id="sec-rl">27. Learning by Doing (Reinforcement Learning)</h2>
     <p>Supervised learning needs labels. Self-supervised learning extracts labels from the data itself. But what about
         problems where there <em>is</em> no dataset at all—just an environment you can interact with?</p>
 
@@ -1050,7 +1090,7 @@
         across millions of possible states—turning brute-force memorization into genuine strategic reasoning.</p>
 
     <span class="section-tag tag-reasoning">REASONING</span>
-    <h2 id="sec-ga">27. Survival of the Fittest (Genetic Algorithms)</h2>
+    <h2 id="sec-ga">28. Survival of the Fittest (Genetic Algorithms)</h2>
     <p>While gradient descent is powerful, it requires knowing the derivative of our error—the "slope of the hill." But
         what if the landscape is so rugged, or the rules so complex, that we can't easily calculate a gradient? What if
         we are training a robot to walk, and there is no simple mathematical equation linking a twitch of a motor to the
@@ -1086,7 +1126,7 @@
         mathematical elegance for brute-force adaptability.</p>
 
     <span class="section-tag tag-advanced">ADVANCED</span>
-    <h2 id="sec-dqn">28. The Neural Strategist (Deep Q-Learning)</h2>
+    <h2 id="sec-dqn">29. The Neural Strategist (Deep Q-Learning)</h2>
     <p>Our Q-Table from the previous section works beautifully for a small grid. But what happens when the
         state space explodes? A game of Atari has billions of possible screen configurations. A Go board has more
         legal positions than atoms in the universe. No table could ever hold all of those entries.</p>
@@ -1128,7 +1168,7 @@
     </p>
 
     <span class="section-tag tag-advanced">ADVANCED</span>
-    <h2 id="sec-mcts">29. Mastering Games (AlphaZero & MCTS)</h2>
+    <h2 id="sec-mcts">30. Mastering Games (AlphaZero & MCTS)</h2>
     <p>Deep Q-Networks learn to play games by trial and error, but there's a fundamentally different approach:
         <strong>planning ahead</strong>. When a chess grandmaster considers a move, they don't just react to the
         current board—they simulate future sequences of play, evaluating which paths lead to victory. This is
@@ -1166,7 +1206,7 @@
         All from pure self-play, guided by search and a neural network working in concert.</p>
 
     <span class="section-tag tag-reasoning">REASONING</span>
-    <h2 id="sec-cot">30. Thinking Out Loud (Chain of Thought)</h2>
+    <h2 id="sec-cot">31. Thinking Out Loud (Chain of Thought)</h2>
     <p>Every technique we have built so far—self-supervised pre-training, attention, MCTS—produces
         models that answer <em>instantly</em>. One forward pass, one prediction. For simple questions
         this works beautifully. But ask a model to solve a hard math problem like <span class="equation">17 × 24</span>,
@@ -1222,7 +1262,7 @@
     </p>
 
     <span class="section-tag">PHILOSOPHY</span>
-    <h2 id="sec-singularity">31. The Recursive Horizon (The Singularity)</h2>
+    <h2 id="sec-singularity">32. The Recursive Horizon (The Singularity)</h2>
     <p>We have just witnessed something unsettling. A model trained with reinforcement learning
         <em>spontaneously invented self-correction</em> — it learned to doubt itself, to backtrack, to
         think harder. Nobody told it to do this. The reward signal alone was enough. Now ask yourself: what
@@ -1275,7 +1315,7 @@
         descent, attention, reinforcement learning, chain of thought — is a rung on this ladder. The
         question is not whether we will build each rung. It is whether the ladder has a ceiling.</p>
 
-    <h2 id="sec-quiz">32. Test Your Understanding</h2>
+    <h2 id="sec-quiz">33. Test Your Understanding</h2>
     <p>To truly understand it from first principles, you must build it yourself. Below is a live Python environment.
         Write the code for each core component we discussed. You can use <code>print()</code> to debug your logic—the
         output will appear in the console below.</p>
