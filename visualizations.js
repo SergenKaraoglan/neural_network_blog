@@ -5219,6 +5219,222 @@
 })();
 
 // ==========================================
+// 36. PRUNING THE TREE (ALPHA-BETA PRUNING)
+// ==========================================
+(function () {
+    const canvas = document.getElementById('alphabetaCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const stepBtn = document.getElementById('alphabeta-step-btn');
+    const resetBtn = document.getElementById('alphabeta-reset-btn');
+
+    const W = canvas.width, H = canvas.height;
+
+    // Define a static tree for A-B Pruning
+    // R (MAX)
+    // ├── A (MIN)
+    // │   ├── D (LEAF: 3)
+    // │   └── E (LEAF: 5)
+    // └── B (MIN)
+    //     ├── F (LEAF: 2) -> If MIN sees 2, it will never pick anything > 2. MAX already has 3. PRUNE!
+    //     └── G (LEAF: 9)
+    let nodes = [
+        /* 0*/ { id: 'root', type: 'MAX', x: W / 2, y: 50, val: null, children: [1, 2], alpha: -Infinity, beta: Infinity, state: 0 },
+        /* 1*/ { id: 'A', type: 'MIN', x: W / 4, y: 150, val: null, children: [3, 4], alpha: -Infinity, beta: Infinity, state: 0, pruned: false },
+        /* 2*/ { id: 'B', type: 'MIN', x: (W / 4) * 3, y: 150, val: null, children: [5, 6], alpha: -Infinity, beta: Infinity, state: 0, pruned: false },
+        /* 3*/ { id: 'D', type: 'LEAF', x: W / 8, y: 250, val: 3, children: [], state: 0, pruned: false },
+        /* 4*/ { id: 'E', type: 'LEAF', x: (W / 8) * 3, y: 250, val: 5, children: [], state: 0, pruned: false },
+        /* 5*/ { id: 'F', type: 'LEAF', x: (W / 8) * 5, y: 250, val: 2, children: [], state: 0, pruned: false },
+        /* 6*/ { id: 'G', type: 'LEAF', x: (W / 8) * 7, y: 250, val: 9, children: [], state: 0, pruned: false }
+    ];
+
+    let stepCounter = 0;
+
+    // States for nodes: 0=hidden, 1=active/evaluating, 2=done, 3=pruned
+    let steps = [
+        // 0: Start at Root
+        () => { nodes[0].state = 1; },
+        // 1: Go to A
+        () => { nodes[1].state = 1; },
+        // 2: Evaluate D
+        () => { nodes[3].state = 1; },
+        // 3: D returns 3. A updates beta to 3. (MIN wants lowest)
+        () => { nodes[3].state = 2; nodes[1].val = 3; nodes[1].beta = 3; },
+        // 4: Evaluate E
+        () => { nodes[4].state = 1; },
+        // 5: E returns 5. A keeps 3.
+        () => { nodes[4].state = 2; },
+        // 6: A is done, returns 3 to Root. Root updates alpha to 3. (MAX wants highest)
+        () => { nodes[1].state = 2; nodes[0].val = 3; nodes[0].alpha = 3; },
+        // 7: Go to B. Passes alpha=3 down.
+        () => { nodes[2].state = 1; nodes[2].alpha = 3; },
+        // 8: Evaluate F
+        () => { nodes[5].state = 1; },
+        // 9: F returns 2. B updates beta to 2.
+        () => { nodes[5].state = 2; nodes[2].val = 2; nodes[2].beta = 2; },
+        // 10: B's beta (2) <= alpha (3). PRUNING TRIGGERED.
+        () => {
+            nodes[2].state = 2;
+            nodes[6].pruned = true; // Prune G
+            stepBtn.innerText = 'BETA <= ALPHA! PRUNING...';
+            stepBtn.style.background = '#ff0055';
+        },
+        // 11: B returns 2 to Root. Root keeps 3. Root is done.
+        () => {
+            nodes[0].state = 2;
+            stepBtn.innerText = 'FINISHED';
+            stepBtn.style.background = '#333';
+            stepBtn.disabled = true;
+        }
+    ];
+
+    function drawNode(n) {
+        if (n.state === 0 && n.type !== 'LEAF') return; // Only draw lines to visible parts
+
+        ctx.beginPath();
+        if (n.type === 'MAX') {
+            ctx.arc(n.x, n.y, 25, 0, Math.PI * 2);
+        } else if (n.type === 'MIN') {
+            ctx.rect(n.x - 25, n.y - 25, 50, 50);
+        } else if (!n.pruned) {
+            ctx.arc(n.x, n.y, 20, 0, Math.PI * 2);
+        } else {
+            ctx.arc(n.x, n.y, 20, 0, Math.PI * 2);
+        }
+
+        if (n.pruned) {
+            ctx.fillStyle = '#222';
+            ctx.strokeStyle = '#444';
+        } else if (n.state === 1) {
+            ctx.fillStyle = '#0f0f0f';
+            ctx.strokeStyle = '#ffb703'; // active gold
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#ffb703';
+        } else if (n.state === 2) {
+            ctx.fillStyle = '#222';
+            ctx.strokeStyle = '#00e5ff'; // done cyan
+            ctx.shadowBlur = 0;
+        } else {
+            ctx.fillStyle = '#111';
+            ctx.strokeStyle = '#444';
+            ctx.shadowBlur = 0;
+        }
+
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+
+        // Draw Value inside
+        ctx.fillStyle = n.pruned ? '#444' : '#fff';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+
+        if (n.type === 'LEAF') {
+            ctx.font = '16px Courier New';
+            ctx.fillText(n.val, n.x, n.y);
+            if (n.pruned) {
+                // Cross it out
+                ctx.strokeStyle = '#ff0055';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.moveTo(n.x - 15, n.y - 15); ctx.lineTo(n.x + 15, n.y + 15);
+                ctx.stroke();
+            }
+        } else {
+            if (n.val !== null) {
+                ctx.font = '16px Courier New';
+                ctx.fillText(n.val, n.x, n.y);
+            } else {
+                ctx.fillStyle = '#666';
+                ctx.font = '12px Courier New';
+                ctx.fillText(n.type, n.x, n.y);
+            }
+
+            // Draw Alpha/Beta bounds next to node if active or done
+            if (n.state > 0) {
+                ctx.font = '12px Courier New';
+                let aStr = n.alpha === -Infinity ? '-∞' : n.alpha;
+                let bStr = n.beta === Infinity ? '∞' : n.beta;
+                ctx.fillStyle = '#aaa';
+                ctx.fillText(`[α:${aStr}, β:${bStr}]`, n.x + 60, n.y);
+            }
+        }
+    }
+
+    function draw() {
+        ctx.fillStyle = '#0f0f0f';
+        ctx.fillRect(0, 0, W, H);
+
+        // Draw edges
+        ctx.lineWidth = 2;
+        for (let i = 0; i < nodes.length; i++) {
+            let n = nodes[i];
+            for (let c of n.children) {
+                let child = nodes[c];
+
+                if (child.pruned) {
+                    ctx.strokeStyle = '#333';
+                } else if (child.state === 1 || child.state === 2) {
+                    ctx.strokeStyle = '#00e5ff';
+                } else {
+                    ctx.strokeStyle = '#333';
+                }
+
+                ctx.beginPath();
+                ctx.moveTo(n.x, n.y + 25);
+                ctx.lineTo(child.x, child.y - 25);
+                ctx.stroke();
+            }
+        }
+
+        // Draw Nodes
+        for (let i = 0; i < nodes.length; i++) {
+            drawNode(nodes[i]);
+        }
+
+        ctx.font = '14px Courier New';
+        ctx.fillStyle = '#aaa';
+        ctx.textAlign = 'left';
+        ctx.fillText("Circles = MAX (Updates α)", 20, 30);
+        ctx.fillText("Squares = MIN (Updates β)", 20, 50);
+        ctx.fillStyle = '#ff0055';
+        ctx.fillText("Prune if β <= α", 20, 70);
+    }
+
+    if (stepBtn) {
+        stepBtn.addEventListener('click', () => {
+            if (stepCounter < steps.length) {
+                stepBtn.style.background = '#00e5ff';
+                stepBtn.innerText = 'STEP EVALUATION';
+                steps[stepCounter]();
+                stepCounter++;
+                draw();
+            }
+        });
+    }
+
+    if (resetBtn) {
+        resetBtn.addEventListener('click', () => {
+            stepCounter = 0;
+            nodes[0] = { id: 'root', type: 'MAX', x: W / 2, y: 50, val: null, children: [1, 2], alpha: -Infinity, beta: Infinity, state: 0 };
+            nodes[1] = { id: 'A', type: 'MIN', x: W / 4, y: 150, val: null, children: [3, 4], alpha: -Infinity, beta: Infinity, state: 0, pruned: false };
+            nodes[2] = { id: 'B', type: 'MIN', x: (W / 4) * 3, y: 150, val: null, children: [5, 6], alpha: -Infinity, beta: Infinity, state: 0, pruned: false };
+            nodes[3] = { id: 'D', type: 'LEAF', x: W / 8, y: 250, val: 3, children: [], state: 0, pruned: false };
+            nodes[4] = { id: 'E', type: 'LEAF', x: (W / 8) * 3, y: 250, val: 5, children: [], state: 0, pruned: false };
+            nodes[5] = { id: 'F', type: 'LEAF', x: (W / 8) * 5, y: 250, val: 2, children: [], state: 0, pruned: false };
+            nodes[6] = { id: 'G', type: 'LEAF', x: (W / 8) * 7, y: 250, val: 9, children: [], state: 0, pruned: false };
+
+            stepBtn.innerText = 'START EVALUATION';
+            stepBtn.style.background = '#00e5ff';
+            stepBtn.disabled = false;
+            draw();
+        });
+    }
+
+    draw();
+})();
+
+// ==========================================
 // 14. ALPHAZERO & MCTS — TIC-TAC-TOE
 // ==========================================
 (function () {

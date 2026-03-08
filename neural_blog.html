@@ -93,13 +93,14 @@
             <li><a href="#sec-bfs-dfs">Exploring the Maze (BFS &amp; DFS)</a></li>
             <li><a href="#sec-astar">The Heuristic Shortcut (A* Search)</a></li>
             <li><a href="#sec-minimax">Seeing the Future (Minimax)</a></li>
+            <li><a href="#sec-alphabeta">Pruning the Tree (Alpha-Beta Pruning)</a></li>
             <li><a href="#sec-mcts">Mastering Games (AlphaZero &amp; MCTS)</a></li>
             <li><a href="#sec-rlhf">Aligning with Humanity (RLHF)</a></li>
             <li><a href="#sec-cot">Thinking Out Loud (Chain of Thought)</a></li>
         </ol>
 
         <p class="toc-part">Closing</p>
-        <ol start="39">
+        <ol start="40">
             <li><a href="#sec-snn">Efficiency and Spikes (Spiking Neural Networks)</a></li>
             <li><a href="#sec-singularity">The Recursive Horizon (The Singularity)</a></li>
             <li><a href="#sec-quiz">Test Your Understanding</a></li>
@@ -1422,7 +1423,30 @@
         games using Minimax alone.</p>
 
     <span class="section-tag tag-advanced">ADVANCED</span>
-    <h2 id="sec-mcts">36. Mastering Games (AlphaZero & MCTS)</h2>
+    <h2 id="sec-alphabeta">36. Pruning the Tree (Alpha-Beta & Deep Blue)</h2>
+    <p>Minimax provides a perfect strategy, but as we saw, the game trees for Chess or Go are unimaginably vast. Evaluating every single possible move all the way to the end of the game is impossible. But what if we didn't <em>have</em> to check every branch? What if we could mathematically prove that a branch is so bad we don't even need to look at it?</p>
+
+    <p>This is the core of <strong>Alpha-Beta Pruning</strong>. As the algorithm searches the tree, it keeps track of two numbers: <strong>Alpha ($lpha$)</strong> (the highest score the Maximizer is guaranteed so far) and <strong>Beta ($eta$)</strong> (the lowest score the Minimizer is guaranteed so far). If the algorithm finds a move that leads to a situation where the opponent can force a worse outcome than a move we already know about, it immediately stops evaluating that branch. It "prunes" the tree.</p>
+
+    <div class="interactive-container" style="min-height: 480px; padding-bottom: 2rem;">
+        <canvas id="alphabetaCanvas" width="600" height="350"></canvas>
+        <div class="controls" style="flex-direction: column; align-items: center; gap: 15px;">
+            <div style="display: flex; gap: 10px;">
+                <button id="alphabeta-step-btn" style="background:#00e5ff; color:#000;">STEP EVALUATION</button>
+                <button id="alphabeta-reset-btn" style="background:#333; color:#fff;">RESET</button>
+            </div>
+        </div>
+        <p style="font-size: 0.9rem; color: #888; text-align: center; margin-top: 1rem; font-family: 'Courier New', monospace;">
+            Click <strong>STEP EVALUATION</strong> to walk through the tree using Alpha-Beta pruning. Watch the $[lpha, eta]$ bounds update at each node. Crucially, notice how entire branches are greyed out (pruned) when the algorithm realizes further search is futile!
+        </p>
+    </div>
+
+    <p>Alpha-Beta pruning drastically reduces the number of nodes that need to be evaluated, effectively doubling the depth an AI can search in the same amount of time. Up until the deep learning revolution, this was the undisputed king of game AI.</p>
+
+    <p>It reached its absolute pinnacle in 1997 with IBM's <strong>Deep Blue</strong>. Deep Blue didn't use neural networks or self-play; it used an incredibly heavily optimized Alpha-Beta search. Running on massive custom supercomputer hardware designed specifically to generate and evaluate chess positions, Deep Blue could evaluate a staggering <strong>200 million positions per second</strong>. Using brute-force search and Alpha-Beta pruning to look up to 14 moves deep into the future, it accomplished the unthinkable: defeating the reigning World Chess Champion, Garry Kasparov.</p>
+
+    <span class="section-tag tag-advanced">ADVANCED</span>
+    <h2 id="sec-mcts">37. Mastering Games (AlphaZero & MCTS)</h2>
     <p>Deep Q-Networks learn to play games by trial and error, but there's a fundamentally different approach:
         <strong>planning ahead</strong>. When a chess grandmaster considers a move, they don't just react to the
         current board—they simulate future sequences of play, evaluating which paths lead to victory. This is
@@ -1460,7 +1484,7 @@
         All from pure self-play, guided by search and a neural network working in concert.</p>
 
     <span class="section-tag tag-alignment">ALIGNMENT</span>
-    <h2 id="sec-rlhf">37. Aligning with Humanity (RLHF)</h2>
+    <h2 id="sec-rlhf">38. Aligning with Humanity (RLHF)</h2>
     <p>A raw Language Model is a statistical mirror. It has read the entire internet, and its only goal is to predict
         the most likely next word. If prompted with <em>"How to steal a..."</em>, a raw model doesn't understand
         morality; it simply knows that the internet frequently follows that phrase with <em>"car"</em>. It assigns a
@@ -1515,7 +1539,7 @@
         RLHF to pure autonomous reasoning—which leads us directly to Chain of Thought.</p>
 
     <span class="section-tag tag-reasoning">REASONING</span>
-    <h2 id="sec-cot">38. Thinking Out Loud (Chain of Thought)</h2>
+    <h2 id="sec-cot">39. Thinking Out Loud (Chain of Thought)</h2>
     <p>Every technique we have built so far—self-supervised pre-training, attention, MCTS—produces
         models that answer <em>instantly</em>. One forward pass, one prediction. For simple questions
         this works beautifully. But ask a model to solve a hard math problem like <span class="equation">17 × 24</span>,
@@ -1571,7 +1595,7 @@
     </p>
 
     <span class="section-tag tag-advanced">HARDWARE FUTURE</span>
-    <h2 id="sec-snn">39. Efficiency and Spikes (Spiking Neural Networks)</h2>
+    <h2 id="sec-snn">40. Efficiency and Spikes (Spiking Neural Networks)</h2>
     <p>Everything we have discussed so far—from the simplest neuron to the largest Transformer—operates on the same
         fundamental principle: dense, continuous mathematics. At every layer, for every input, millions of
         floating-point numbers are multiplied and added together. This is incredibly powerful, but it is also massively
@@ -1610,7 +1634,7 @@
         and sensors—while consuming mere milliwatts of power.</p>
 
     <span class="section-tag">PHILOSOPHY</span>
-    <h2 id="sec-singularity">40. The Recursive Horizon (The Singularity)</h2>
+    <h2 id="sec-singularity">41. The Recursive Horizon (The Singularity)</h2>
     <p>We have just witnessed something unsettling. A model trained with reinforcement learning
         <em>spontaneously invented self-correction</em> — it learned to doubt itself, to backtrack, to
         think harder. Nobody told it to do this. The reward signal alone was enough. Now ask yourself: what
@@ -1663,7 +1687,7 @@
         descent, attention, reinforcement learning, chain of thought — is a rung on this ladder. The
         question is not whether we will build each rung. It is whether the ladder has a ceiling.</p>
 
-    <h2 id="sec-quiz">41. Test Your Understanding</h2>
+    <h2 id="sec-quiz">42. Test Your Understanding</h2>
     <p>To truly understand it from first principles, you must build it yourself. Below is a live Python environment.
         Write the code for each core component we discussed. You can use <code>print()</code> to debug your logic—the
         output will appear in the console below.</p>
