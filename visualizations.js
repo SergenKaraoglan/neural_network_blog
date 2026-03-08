@@ -2949,6 +2949,200 @@
 })();
 
 // ==========================================
+// 15. ESCAPING THE VALLEYS (ADAM OPTIMIZER)
+// ==========================================
+(function () {
+    const canvas = document.getElementById('adamCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const btnRun = document.getElementById('adam-run-btn');
+    const btnReset = document.getElementById('adam-reset-btn');
+
+    const W = canvas.width, H = canvas.height;
+
+    // Landscape defined: L(x, y) = 0.5 * x^2 + 20 * y^2
+    // We scale this to pixels. World coordinates from [-3, 3] in X, [-2, 2] in Y
+    const X_MIN = -3, X_MAX = 3;
+    const Y_MIN = -1.5, Y_MAX = 1.5;
+
+    function w2p(x, y) {
+        return {
+            x: ((x - X_MIN) / (X_MAX - X_MIN)) * W,
+            y: ((y - Y_MIN) / (Y_MAX - Y_MIN)) * H
+        };
+    }
+
+    function grad_loss(x, y) {
+        // Gradient of L = x^2 / 20 + y^2 * 5
+        // dx = x/10, dy = 10*y
+        // We add a tilt to make the ravine slowly approach minimum
+        return {
+            dx: x / 2, // Slope along the ravine
+            dy: 25 * y // Steep walls
+        };
+    }
+
+    // Agent states
+    let t = 0;
+
+    // SGD Agent
+    let sgd = {
+        x: -2.5, y: 1.0,
+        lr: 0.05,
+        path: []
+    };
+
+    // Adam Agent
+    let adam = {
+        x: -2.5, y: 1.0,
+        lr: 0.1,
+        m_dx: 0, m_dy: 0,
+        v_dx: 0, v_dy: 0,
+        beta1: 0.9, beta2: 0.999, eps: 1e-8,
+        path: []
+    };
+
+    let isRunning = false;
+    let animId = null;
+
+    function resetAgents() {
+        if (animId) cancelAnimationFrame(animId);
+        t = 0;
+        sgd = { x: -2.5, y: 1.0, lr: 0.05, path: [] };
+        adam = { x: -2.5, y: 1.0, lr: 0.1, m_dx: 0, m_dy: 0, v_dx: 0, v_dy: 0, beta1: 0.9, beta2: 0.999, eps: 1e-8, path: [] };
+        isRunning = false;
+        draw();
+    }
+
+    function drawBackground() {
+        ctx.fillStyle = '#111';
+        ctx.fillRect(0, 0, W, H);
+
+        // Draw some contour lines approximately
+        ctx.lineWidth = 1;
+        for (let r = 0; r < 10; r++) {
+            const rad = r * 0.4;
+            ctx.beginPath();
+            ctx.strokeStyle = `rgba(255, 255, 255, ${0.05 + r * 0.02})`;
+            for (let a = 0; a < Math.PI * 2; a += 0.1) {
+                // Invert the loss function shape to draw ellipses
+                // x^2/2 + 25y*y = C
+                let px = Math.cos(a) * rad * 4; // Stretch along X
+                let py = Math.sin(a) * rad * 0.4; // Compress along Y
+
+                let pt = w2p(px, py);
+                if (a === 0) ctx.moveTo(pt.x, pt.y);
+                else ctx.lineTo(pt.x, pt.y);
+            }
+            ctx.closePath();
+            ctx.stroke();
+        }
+
+        // Draw minimum
+        let minPt = w2p(0, 0);
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.arc(minPt.x, minPt.y, 10, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#000';
+        ctx.font = 'bold 10px Courier New';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('MIN', minPt.x, minPt.y);
+    }
+
+    function drawAgent(agent, color) {
+        // Draw path
+        if (agent.path.length > 1) {
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            for (let i = 0; i < agent.path.length; i++) {
+                let p = w2p(agent.path[i].x, agent.path[i].y);
+                if (i === 0) ctx.moveTo(p.x, p.y);
+                else ctx.lineTo(p.x, p.y);
+            }
+            ctx.stroke();
+        }
+
+        // Draw head
+        let p = w2p(agent.x, agent.y);
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = color;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+    }
+
+    function draw() {
+        drawBackground();
+        drawAgent(sgd, '#ff0055');
+        drawAgent(adam, '#00ff88');
+
+        // UI
+        ctx.fillStyle = '#fff';
+        ctx.font = '12px Courier New';
+        ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+        ctx.fillText(`STEPS: ${t}`, 10, 10);
+    }
+
+    function step() {
+        t++;
+
+        // --- Process SGD ---
+        let grad = grad_loss(sgd.x, sgd.y);
+        sgd.path.push({ x: sgd.x, y: sgd.y });
+        sgd.x -= sgd.lr * grad.dx;
+        sgd.y -= sgd.lr * grad.dy;
+
+        // --- Process Adam ---
+        let ag = grad_loss(adam.x, adam.y);
+        adam.path.push({ x: adam.x, y: adam.y });
+
+        adam.m_dx = adam.beta1 * adam.m_dx + (1 - adam.beta1) * ag.dx;
+        adam.m_dy = adam.beta1 * adam.m_dy + (1 - adam.beta1) * ag.dy;
+
+        adam.v_dx = adam.beta2 * adam.v_dx + (1 - adam.beta2) * (ag.dx * ag.dx);
+        adam.v_dy = adam.beta2 * adam.v_dy + (1 - adam.beta2) * (ag.dy * ag.dy);
+
+        let m_hat_dx = adam.m_dx / (1 - Math.pow(adam.beta1, t));
+        let m_hat_dy = adam.m_dy / (1 - Math.pow(adam.beta1, t));
+
+        let v_hat_dx = adam.v_dx / (1 - Math.pow(adam.beta2, t));
+        let v_hat_dy = adam.v_dy / (1 - Math.pow(adam.beta2, t));
+
+        adam.x -= adam.lr * m_hat_dx / (Math.sqrt(v_hat_dx) + adam.eps);
+        adam.y -= adam.lr * m_hat_dy / (Math.sqrt(v_hat_dy) + adam.eps);
+
+        draw();
+
+        if (isRunning && t < 300) {
+            animId = requestAnimationFrame(step);
+        } else {
+            isRunning = false;
+        }
+    }
+
+    if (btnRun) {
+        btnRun.addEventListener('click', () => {
+            if (!isRunning) {
+                if (t >= 300) resetAgents();
+                isRunning = true;
+                step();
+            }
+        });
+    }
+
+    if (btnReset) {
+        btnReset.addEventListener('click', resetAgents);
+    }
+
+    resetAgents();
+})();
+
+// ==========================================
 // 12. THE MEMORIZATION PROBLEM (OVERFITTING)
 // ==========================================
 (function () {

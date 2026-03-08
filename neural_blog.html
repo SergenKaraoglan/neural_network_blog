@@ -60,11 +60,12 @@
             <li><a href="#sec-universal">The Shape of Anything (Universal Approximation)</a></li>
             <li><a href="#sec-backprop">The Calculus of Blame</a></li>
             <li><a href="#sec-batches">Batches, Epochs, and Chaos</a></li>
+            <li><a href="#sec-adam">Escaping the Valleys (Adam Optimizer)</a></li>
             <li><a href="#sec-overfit">The Memorization Problem</a></li>
         </ol>
 
         <p class="toc-part">Part II — Language</p>
-        <ol start="16">
+        <ol start="17">
             <li><a href="#sec-markov">Predicting the Next Step (Markov Chains)</a></li>
             <li><a href="#sec-rnn">Memory and Time (RNNs)</a></li>
             <li><a href="#sec-attention">The Attention Mechanism</a></li>
@@ -74,7 +75,7 @@
         </ol>
 
         <p class="toc-part">Part III — Vision</p>
-        <ol start="22">
+        <ol start="23">
             <li><a href="#sec-cnn">Seeing the World (CNNs)</a></li>
             <li><a href="#sec-genai">Dreaming Machines (GenAI)</a></li>
             <li><a href="#sec-gan">The Art of Forgery (GANs)</a></li>
@@ -84,7 +85,7 @@
         </ol>
 
         <p class="toc-part">Part IV — Reinforcement Learning</p>
-        <ol start="28">
+        <ol start="29">
             <li><a href="#sec-bandits">The Gambler's Dilemma (Multi-Armed Bandits)</a></li>
             <li><a href="#sec-rl">Learning by Doing</a></li>
             <li><a href="#sec-ga">Survival of the Fittest (Genetic Algorithms)</a></li>
@@ -98,7 +99,7 @@
         </ol>
 
         <p class="toc-part">Closing</p>
-        <ol start="38">
+        <ol start="39">
             <li><a href="#sec-snn">Efficiency and Spikes (Spiking Neural Networks)</a></li>
             <li><a href="#sec-singularity">The Recursive Horizon (The Singularity)</a></li>
             <li><a href="#sec-quiz">Test Your Understanding</a></li>
@@ -603,7 +604,43 @@
         bottoms out in the deepest valley it can find.</p>
 
     <span class="section-tag tag-advanced">ADVANCED</span>
-    <h2 id="sec-overfit">15. The Memorization Problem (Overfitting & Regularization)</h2>
+    <h2 id="sec-adam">15. Escaping the Valleys (Adam Optimizer)</h2>
+    <p>We just saw how standard Stochastic Gradient Descent (SGD) works. It takes a step in the direction of the
+        steepest downward slope for the current mini-batch. But what if the landscape is a long, narrow ravine? SGD will
+        stubbornly bounce back and forth across the steep walls of the ravine, making agonizingly slow progress toward
+        the actual minimum at the bottom.</p>
+
+    <p>To fix this, researchers introduced two ideas: <strong>Momentum</strong> and <strong>Adaptive Learning
+            Rates</strong>. Momentum is like rolling a heavy ball down a hill: it builds up speed in consistent
+        directions and blasts through small bumps. Adaptive Learning Rates (like RMSProp) keep a running average of
+        recent gradient sizes, shrinking the step size in steep dimensions to stop the bouncing, while carefully
+        increasing it in flat dimensions to speed up progress.</p>
+
+    <p>When you combine these two ideas—Momentum and RMSProp—you get <strong>Adam (Adaptive Moment Estimation)</strong>.
+        Introduced in 2014, it is arguably the most famous and widely used optimizer in all of deep learning. By
+        maintaining moving averages of both the gradients and the squared gradients, Adam dynamically adapts its
+        learning rate for every single parameter, sprinting down ravines while standard SGD slowly zig-zags.</p>
+
+    <div class="interactive-container" style="min-height: 480px; padding-bottom: 2rem;">
+        <canvas id="adamCanvas" width="600" height="400"
+            style="background:#111; border:1px solid #333; cursor:crosshair;"></canvas>
+        <div class="controls" style="flex-direction: column; align-items: center; gap: 15px;">
+            <div style="display: flex; gap: 10px;">
+                <button id="adam-run-btn" style="background:#00e5ff; color:#000;">RACE SGD vs ADAM</button>
+                <button id="adam-reset-btn" style="background:#333; color:#fff;">RESET</button>
+            </div>
+        </div>
+        <p
+            style="font-size: 0.9rem; color: #888; text-align: center; margin-top: 1rem; font-family: 'Courier New', monospace;">
+            Click <strong>RACE</strong> to drop two optimizers into a complex 2D loss landscape. You'll see the <span
+                style="color:#ff0055">red dot (SGD)</span> stubbornly bouncing back and forth down the ravine walls,
+            while the <span style="color:#00ff88">green dot (Adam)</span> quickly dampens the oscillations and sprints
+            toward the minimum!
+        </p>
+    </div>
+
+    <span class="section-tag tag-advanced">ADVANCED</span>
+    <h2 id="sec-overfit">16. The Memorization Problem (Overfitting & Regularization)</h2>
     <p>We've continuously added more power to our network: multi-dimensional hinges, deep layers, and self-attention.
         But power introduces a dangerous new problem. If you give a network millions of parameters to solve a simple
         dataset, it might stop looking for the underlying logical pattern and instead just <em>memorize</em> the
@@ -643,7 +680,7 @@
     </div>
 
     <span class="section-tag tag-sequence">SEQUENCE</span>
-    <h2 id="sec-markov">16. Predicting the Next Step (Markov Chains)</h2>
+    <h2 id="sec-markov">17. Predicting the Next Step (Markov Chains)</h2>
     <p>Before we teach a neural network to understand language, let's look at the simplest mathematical model for
         sequences. Imagine predicting the weather: if it is sunny today, what will it be tomorrow? A
         <strong>Markov Chain</strong> answers this with a single, elegant rule: <em>the future depends only on the
@@ -678,7 +715,7 @@
         paragraphs ago. Neural networks solve this by learning to compress arbitrary history into a hidden state.</p>
 
     <span class="section-tag tag-sequence">SEQUENCE</span>
-    <h2 id="sec-rnn">17. Memory and Time (Recurrent Networks)</h2>
+    <h2 id="sec-rnn">18. Memory and Time (Recurrent Networks)</h2>
     <p>Everything we have built so far — from feed-forward classifiers to Markov Chains — shares a common
         limitation: they have no memory of the past. A Markov Chain looks only at the current state. A feed-forward
         network processes each input in isolation. Neither can tell if "bank" means a river bank or a financial
@@ -720,7 +757,7 @@
     </p>
 
     <span class="section-tag tag-advanced">ADVANCED</span>
-    <h2 id="sec-attention">18. The Attention Mechanism (Transformers & LLMs)</h2>
+    <h2 id="sec-attention">19. The Attention Mechanism (Transformers & LLMs)</h2>
     <p>We have just seen how RNNs solve the sequence problem by maintaining a hidden state—but at the cost of
         vanishing gradients and sequential bottlenecks. In 2017, a paper titled
         <em>"Attention Is All You Need"</em> proposed a radical alternative: throw away the recurrence entirely and
@@ -747,7 +784,7 @@
     </div>
 
     <span class="section-tag tag-advanced">ADVANCED</span>
-    <h2 id="sec-tokenisation">19. Breaking Words Apart (Tokenisation)</h2>
+    <h2 id="sec-tokenisation">20. Breaking Words Apart (Tokenisation)</h2>
     <p>We've just seen how Transformers use attention to understand relationships between words in a sentence. But
         there's a deeper question we've been quietly ignoring: <em>how does the network see "words" in the first
             place?</em> A neural network is a mathematical machine. It cannot read the letter "a." It needs
@@ -791,7 +828,7 @@
         the Transformer. The model never sees raw text; it sees a river of numbers, shaped by this algorithm.</p>
 
     <span class="section-tag tag-advanced">ADVANCED</span>
-    <h2 id="sec-embeddings">20. Words as Coordinates (Embeddings)</h2>
+    <h2 id="sec-embeddings">21. Words as Coordinates (Embeddings)</h2>
     <p>Tokenisation gives us integer IDs, but a raw number like <em>4,271</em> contains no meaning. The network
         cannot tell that <em>"king"</em> (token 4,271) is conceptually closer to <em>"queen"</em> (token 8,903)
         than to <em>"refrigerator"</em> (token 15,440). We need a richer representation.</p>
@@ -831,7 +868,7 @@
         on these coordinates, computing distances and directions to derive meaning.</p>
 
     <span class="section-tag tag-generative">GENERATIVE</span>
-    <h2 id="sec-ssl">21. Teaching Without a Teacher (Self-Supervised Learning)</h2>
+    <h2 id="sec-ssl">22. Teaching Without a Teacher (Self-Supervised Learning)</h2>
     <p>Every technique we have built so far is <strong>supervised learning</strong>: a human must hand-label every
         piece of training data. "This image is a cat." "This fruit is lemon." "This email is spam." For every
         example the network learns from, a human had to sit down and write the answer. This is the bottleneck.
@@ -875,7 +912,7 @@
     </div>
 
     <span class="section-tag tag-advanced">ADVANCED</span>
-    <h2 id="sec-cnn">22. Seeing the World (Convolutional Networks)</h2>
+    <h2 id="sec-cnn">23. Seeing the World (Convolutional Networks)</h2>
     <p>We've talked about classifying fruit based on two numbers: weight and yellowness. But what if our input isn't a
         couple of numbers, but an <em>image</em>—say, a 28x28 grid of pixels? That's 784 numbers. If we passed those 784
         numbers into a standard feed-forward layer with 1,000 neurons, we would need 784,000 weights just for the first
@@ -907,7 +944,7 @@
         edges, then corners, then eyes, then faces.</p>
 
     <span class="section-tag tag-generative">GENERATIVE</span>
-    <h2 id="sec-genai">23. Dreaming Machines (Generative AI)</h2>
+    <h2 id="sec-genai">24. Dreaming Machines (Generative AI)</h2>
     <p>Everything up to this point has been discriminative AI: looking at data and assigning it a boundary or a
         probability. But what happens when we ask the network to generate brand new data? This is Generative AI.</p>
 
@@ -940,7 +977,7 @@
     </div>
 
     <span class="section-tag tag-generative">GENERATIVE</span>
-    <h2 id="sec-gan">24. The Art of Forgery (Generative Adversarial Networks)</h2>
+    <h2 id="sec-gan">25. The Art of Forgery (Generative Adversarial Networks)</h2>
     <p>Diffusion models pull structure from noise. But before diffusion, there was an older, more dramatic idea:
         what if we trained two neural networks to <em>fight each other</em>?</p>
 
@@ -982,7 +1019,7 @@
         beautiful ideas in machine learning.</p>
 
     <span class="section-tag tag-generative">GENERATIVE</span>
-    <h2 id="sec-vae">25. Compressing Reality (Variational Autoencoders)</h2>
+    <h2 id="sec-vae">26. Compressing Reality (Variational Autoencoders)</h2>
     <p>GANs generate data through adversarial competition. But there is a completely different generative
         philosophy: what if we learned to <em>compress</em> data into its essence, and then <em>decompress</em>
         it back? This is the idea behind the <strong>Autoencoder</strong>.</p>
@@ -1026,7 +1063,7 @@
         two points interpolates smoothly between two concepts.</p>
 
     <span class="section-tag tag-generative">GENERATIVE</span>
-    <h2 id="sec-latent">26. The Space Between (Manifolds &amp; Latent Spaces)</h2>
+    <h2 id="sec-latent">27. The Space Between (Manifolds &amp; Latent Spaces)</h2>
     <p>We've talked about how neural networks fold space and generate data, but <em>where</em> does that data come from?
         When a model like Midjourney turns text into an image, it isn't pulling from a database; it's navigating a
         <strong>Latent Space</strong>.
@@ -1068,7 +1105,7 @@
     </p>
 
     <span class="section-tag tag-advanced">ADVANCED</span>
-    <h2 id="sec-disentanglement">27. Untangling the Threads (Disentanglement)</h2>
+    <h2 id="sec-disentanglement">28. Untangling the Threads (Disentanglement)</h2>
     <p>A beautiful consequence of Latent Spaces is that we can sometimes enforce <em>structure</em> onto them. By
         default, an Autoencoder might compress a face into a small vector of numbers, but those numbers are deeply
         entangled. Changing number #4 might make the hair longer, the smile wider, and the lighting darker all at once.
@@ -1113,7 +1150,7 @@
     </div>
 
     <span class="section-tag tag-advanced">ADVANCED</span>
-    <h2 id="sec-bandits">28. The Gambler's Dilemma (Multi-Armed Bandits)</h2>
+    <h2 id="sec-bandits">29. The Gambler's Dilemma (Multi-Armed Bandits)</h2>
     <p>Before we teach an agent to navigate environments and plan ahead, there is a simpler, more
         fundamental problem. Imagine you are standing in front of a row of slot machines. Each machine
         has a different, unknown probability of paying out. You have a limited number of pulls. How do
@@ -1157,7 +1194,7 @@
         to the bandit framework, we get the full RL problem.</p>
 
     <span class="section-tag tag-advanced">ADVANCED</span>
-    <h2 id="sec-rl">29. Learning by Doing (Reinforcement Learning)</h2>
+    <h2 id="sec-rl">30. Learning by Doing (Reinforcement Learning)</h2>
     <p>Supervised learning needs labels. Self-supervised learning extracts labels from the data itself. But what about
         problems where there <em>is</em> no dataset at all—just an environment you can interact with?</p>
 
@@ -1202,7 +1239,7 @@
         across millions of possible states—turning brute-force memorization into genuine strategic reasoning.</p>
 
     <span class="section-tag tag-reasoning">REASONING</span>
-    <h2 id="sec-ga">30. Survival of the Fittest (Genetic Algorithms)</h2>
+    <h2 id="sec-ga">31. Survival of the Fittest (Genetic Algorithms)</h2>
     <p>While gradient descent is powerful, it requires knowing the derivative of our error—the "slope of the hill." But
         what if the landscape is so rugged, or the rules so complex, that we can't easily calculate a gradient? What if
         we are training a robot to walk, and there is no simple mathematical equation linking a twitch of a motor to the
@@ -1238,7 +1275,7 @@
         mathematical elegance for brute-force adaptability.</p>
 
     <span class="section-tag tag-advanced">ADVANCED</span>
-    <h2 id="sec-dqn">31. The Neural Strategist (Deep Q-Learning)</h2>
+    <h2 id="sec-dqn">32. The Neural Strategist (Deep Q-Learning)</h2>
     <p>Our Q-Table from the previous section works beautifully for a small grid. But what happens when the
         state space explodes? A game of Atari has billions of possible screen configurations. A Go board has more
         legal positions than atoms in the universe. No table could ever hold all of those entries.</p>
@@ -1280,7 +1317,7 @@
     </p>
 
     <span class="section-tag tag-advanced">ADVANCED</span>
-    <h2 id="sec-bfs-dfs">32. Exploring the Maze (BFS & DFS)</h2>
+    <h2 id="sec-bfs-dfs">33. Exploring the Maze (BFS & DFS)</h2>
 
     <p>Before an AI can evaluate the quality of future paths, it must first know <em>how</em> to explore them. The
         algorithmic capability to search through possible states—whether it's moves on a chessboard or intersecting
@@ -1316,7 +1353,7 @@
     </div>
 
     <span class="section-tag tag-advanced">ADVANCED</span>
-    <h2 id="sec-astar">33. The Heuristic Shortcut (A* Search)</h2>
+    <h2 id="sec-astar">34. The Heuristic Shortcut (A* Search)</h2>
 
     <p>Both BFS and DFS are <em>uninformed</em> search algorithms. They look at every possible path without knowing
         where the target actually is. This is like trying to drive from New York to Los Angeles by systematically trying
@@ -1350,7 +1387,7 @@
     </div>
 
     <span class="section-tag tag-advanced">ADVANCED</span>
-    <h2 id="sec-minimax">34. Seeing the Future (Minimax)</h2>
+    <h2 id="sec-minimax">35. Seeing the Future (Minimax)</h2>
 
     <p>We know how an AI can learn a strategy through trial and error (Reinforcement Learning), but classical
         game-playing AI didn't learn—it <em>searched</em>. If you define every possible legal move in a game, you create
@@ -1385,7 +1422,7 @@
         games using Minimax alone.</p>
 
     <span class="section-tag tag-advanced">ADVANCED</span>
-    <h2 id="sec-mcts">35. Mastering Games (AlphaZero & MCTS)</h2>
+    <h2 id="sec-mcts">36. Mastering Games (AlphaZero & MCTS)</h2>
     <p>Deep Q-Networks learn to play games by trial and error, but there's a fundamentally different approach:
         <strong>planning ahead</strong>. When a chess grandmaster considers a move, they don't just react to the
         current board—they simulate future sequences of play, evaluating which paths lead to victory. This is
@@ -1423,7 +1460,7 @@
         All from pure self-play, guided by search and a neural network working in concert.</p>
 
     <span class="section-tag tag-alignment">ALIGNMENT</span>
-    <h2 id="sec-rlhf">36. Aligning with Humanity (RLHF)</h2>
+    <h2 id="sec-rlhf">37. Aligning with Humanity (RLHF)</h2>
     <p>A raw Language Model is a statistical mirror. It has read the entire internet, and its only goal is to predict
         the most likely next word. If prompted with <em>"How to steal a..."</em>, a raw model doesn't understand
         morality; it simply knows that the internet frequently follows that phrase with <em>"car"</em>. It assigns a
@@ -1478,7 +1515,7 @@
         RLHF to pure autonomous reasoning—which leads us directly to Chain of Thought.</p>
 
     <span class="section-tag tag-reasoning">REASONING</span>
-    <h2 id="sec-cot">37. Thinking Out Loud (Chain of Thought)</h2>
+    <h2 id="sec-cot">38. Thinking Out Loud (Chain of Thought)</h2>
     <p>Every technique we have built so far—self-supervised pre-training, attention, MCTS—produces
         models that answer <em>instantly</em>. One forward pass, one prediction. For simple questions
         this works beautifully. But ask a model to solve a hard math problem like <span class="equation">17 × 24</span>,
@@ -1534,7 +1571,7 @@
     </p>
 
     <span class="section-tag tag-advanced">HARDWARE FUTURE</span>
-    <h2 id="sec-snn">38. Efficiency and Spikes (Spiking Neural Networks)</h2>
+    <h2 id="sec-snn">39. Efficiency and Spikes (Spiking Neural Networks)</h2>
     <p>Everything we have discussed so far—from the simplest neuron to the largest Transformer—operates on the same
         fundamental principle: dense, continuous mathematics. At every layer, for every input, millions of
         floating-point numbers are multiplied and added together. This is incredibly powerful, but it is also massively
@@ -1573,7 +1610,7 @@
         and sensors—while consuming mere milliwatts of power.</p>
 
     <span class="section-tag">PHILOSOPHY</span>
-    <h2 id="sec-singularity">39. The Recursive Horizon (The Singularity)</h2>
+    <h2 id="sec-singularity">40. The Recursive Horizon (The Singularity)</h2>
     <p>We have just witnessed something unsettling. A model trained with reinforcement learning
         <em>spontaneously invented self-correction</em> — it learned to doubt itself, to backtrack, to
         think harder. Nobody told it to do this. The reward signal alone was enough. Now ask yourself: what
@@ -1626,7 +1663,7 @@
         descent, attention, reinforcement learning, chain of thought — is a rung on this ladder. The
         question is not whether we will build each rung. It is whether the ladder has a ceiling.</p>
 
-    <h2 id="sec-quiz">40. Test Your Understanding</h2>
+    <h2 id="sec-quiz">41. Test Your Understanding</h2>
     <p>To truly understand it from first principles, you must build it yourself. Below is a live Python environment.
         Write the code for each core component we discussed. You can use <code>print()</code> to debug your logic—the
         output will appear in the console below.</p>
