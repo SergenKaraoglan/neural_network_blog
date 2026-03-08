@@ -44,9 +44,13 @@
             <li><a href="#sec-context">The Winter and the Spring</a></li>
         </ol>
 
-        <p class="toc-part">Part I — Fundamentals</p>
+        <p class="toc-part">Part IA — Mathematics</p>
         <ol start="1">
             <li><a href="#sec-linalg">The Language of Machines (Linear Algebra)</a></li>
+        </ol>
+
+        <p class="toc-part">Part IB — Machine Learning</p>
+        <ol start="2">
             <li><a href="#sec-neuron">A Single Artificial Neuron</a></li>
             <li><a href="#sec-layers">Adding Neurons and Layers</a></li>
             <li><a href="#sec-curves">The Problem of Curves</a></li>
@@ -122,9 +126,9 @@
     <p>Suddenly, what took months to compute took hours. Researchers began adding more and more "Hidden Layers" to their
         models—hence the term <strong>Deep Learning</strong>. Let's look at how the layers and math actually work.</p>
 
-    <div class="part-header" id="part-fundamentals">
-        <h3>Part I</h3>
-        <p>Fundamentals</p>
+    <div class="part-header" id="part-mathematics">
+        <h3>Part IA</h3>
+        <p>Mathematics</p>
     </div>
 
     <span class="section-tag tag-beginner">BEGINNER</span>
@@ -190,6 +194,11 @@
             Drag the head of the vector to move it. The Matrix multiplies against the Vector. This spatial
             transformation is the foundational operation of every neural network.
         </p>
+    </div>
+
+    <div class="part-header" id="part-machine-learning" style="margin-top: 4rem;">
+        <h3>Part IB</h3>
+        <p>Machine Learning</p>
     </div>
 
     <span class="section-tag tag-fundamentals">FUNDAMENTALS</span>
@@ -1424,9 +1433,18 @@
 
     <span class="section-tag tag-advanced">ADVANCED</span>
     <h2 id="sec-alphabeta">36. Pruning the Tree (Alpha-Beta & Deep Blue)</h2>
-    <p>Minimax provides a perfect strategy, but as we saw, the game trees for Chess or Go are unimaginably vast. Evaluating every single possible move all the way to the end of the game is impossible. But what if we didn't <em>have</em> to check every branch? What if we could mathematically prove that a branch is so bad we don't even need to look at it?</p>
+    <p>Minimax provides a perfect strategy, but as we saw, the game trees for Chess or Go are unimaginably vast.
+        Evaluating every single possible move all the way to the end of the game is impossible. But what if we didn't
+        <em>have</em> to check every branch? What if we could mathematically prove that a branch is so bad we don't even
+        need to look at it?
+    </p>
 
-    <p>This is the core of <strong>Alpha-Beta Pruning</strong>. As the algorithm searches the tree, it keeps track of two numbers: <strong>Alpha ($lpha$)</strong> (the highest score the Maximizer is guaranteed so far) and <strong>Beta ($eta$)</strong> (the lowest score the Minimizer is guaranteed so far). If the algorithm finds a move that leads to a situation where the opponent can force a worse outcome than a move we already know about, it immediately stops evaluating that branch. It "prunes" the tree.</p>
+    <p>This is the core of <strong>Alpha-Beta Pruning</strong>. As the algorithm searches the tree, it keeps track of
+        two numbers: <strong>Alpha ($\alpha$)</strong> (the highest score the Maximizer is guaranteed so far) and
+        <strong>Beta ($\beta$)</strong> (the lowest score the Minimizer is guaranteed so far). If the algorithm finds a
+        move that leads to a situation where the opponent can force a worse outcome than a move we already know about,
+        it immediately stops evaluating that branch. It "prunes" the tree.
+    </p>
 
     <div class="interactive-container" style="min-height: 480px; padding-bottom: 2rem;">
         <canvas id="alphabetaCanvas" width="600" height="350"></canvas>
@@ -1436,14 +1454,24 @@
                 <button id="alphabeta-reset-btn" style="background:#333; color:#fff;">RESET</button>
             </div>
         </div>
-        <p style="font-size: 0.9rem; color: #888; text-align: center; margin-top: 1rem; font-family: 'Courier New', monospace;">
-            Click <strong>STEP EVALUATION</strong> to walk through the tree using Alpha-Beta pruning. Watch the $[lpha, eta]$ bounds update at each node. Crucially, notice how entire branches are greyed out (pruned) when the algorithm realizes further search is futile!
+        <p
+            style="font-size: 0.9rem; color: #888; text-align: center; margin-top: 1rem; font-family: 'Courier New', monospace;">
+            Click <strong>STEP EVALUATION</strong> to walk through the tree using Alpha-Beta pruning. Watch the
+            $[\alpha, \beta]$ bounds update at each node. Crucially, notice how entire branches are greyed out (pruned)
+            when the algorithm realizes further search is futile!
         </p>
     </div>
 
-    <p>Alpha-Beta pruning drastically reduces the number of nodes that need to be evaluated, effectively doubling the depth an AI can search in the same amount of time. Up until the deep learning revolution, this was the undisputed king of game AI.</p>
+    <p>Alpha-Beta pruning drastically reduces the number of nodes that need to be evaluated, effectively doubling the
+        depth an AI can search in the same amount of time. Up until the deep learning revolution, this was the
+        undisputed king of game AI.</p>
 
-    <p>It reached its absolute pinnacle in 1997 with IBM's <strong>Deep Blue</strong>. Deep Blue didn't use neural networks or self-play; it used an incredibly heavily optimized Alpha-Beta search. Running on massive custom supercomputer hardware designed specifically to generate and evaluate chess positions, Deep Blue could evaluate a staggering <strong>200 million positions per second</strong>. Using brute-force search and Alpha-Beta pruning to look up to 14 moves deep into the future, it accomplished the unthinkable: defeating the reigning World Chess Champion, Garry Kasparov.</p>
+    <p>It reached its absolute pinnacle in 1997 with IBM's <strong>Deep Blue</strong>. Deep Blue didn't use neural
+        networks or self-play; it used an incredibly heavily optimized Alpha-Beta search. Running on massive custom
+        supercomputer hardware designed specifically to generate and evaluate chess positions, Deep Blue could evaluate
+        a staggering <strong>200 million positions per second</strong>. Using brute-force search and Alpha-Beta pruning
+        to look up to 14 moves deep into the future, it accomplished the unthinkable: defeating the reigning World Chess
+        Champion, Garry Kasparov.</p>
 
     <span class="section-tag tag-advanced">ADVANCED</span>
     <h2 id="sec-mcts">37. Mastering Games (AlphaZero & MCTS)</h2>
