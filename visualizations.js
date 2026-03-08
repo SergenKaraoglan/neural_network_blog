@@ -4430,6 +4430,239 @@
 })();
 
 // ==========================================
+// 13.1 THE HEURISTIC SHORTCUT (A* SEARCH)
+// ==========================================
+(function () {
+    const canvas = document.getElementById('astarCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const btnRun = document.getElementById('astar-run-btn');
+    const btnReset = document.getElementById('astar-reset-btn');
+
+    const W = canvas.width, H = canvas.height;
+    const COLS = 30, ROWS = 15;
+    const CELL_W = W / COLS, CELL_H = H / ROWS;
+
+    let grid = [];
+    let startCell = { c: 2, r: Math.floor(ROWS / 2) };
+    let targetCell = { c: COLS - 3, r: Math.floor(ROWS / 2) };
+
+    let openSet = [];
+    let visited = new Set();
+    let cameFrom = new Map();
+    let path = [];
+
+    let gScore = new Map();
+    let fScore = new Map();
+
+    let isSearching = false;
+    let animId = null;
+
+    function heuristic(r, c) {
+        return Math.sqrt(Math.pow(r - targetCell.r, 2) + Math.pow(c - targetCell.c, 2));
+    }
+
+    function initGrid() {
+        grid = [];
+        for (let r = 0; r < ROWS; r++) {
+            let row = [];
+            for (let c = 0; c < COLS; c++) row.push(0);
+            grid.push(row);
+        }
+
+        for (let i = 0; i < 80; i++) {
+            let r = Math.floor(Math.random() * ROWS);
+            let c = Math.floor(Math.random() * COLS);
+            if ((r === startCell.r && c === startCell.c) || (r === targetCell.r && c === targetCell.c)) continue;
+            grid[r][c] = 1;
+        }
+    }
+
+    function resetSearch() {
+        if (animId) cancelAnimationFrame(animId);
+        openSet = [];
+        visited.clear();
+        cameFrom.clear();
+        gScore.clear();
+        fScore.clear();
+        path = [];
+        isSearching = false;
+        if (btnRun) btnRun.disabled = false;
+        draw();
+    }
+
+    function draw() {
+        ctx.fillStyle = '#0f0f0f';
+        ctx.fillRect(0, 0, W, H);
+
+        for (let r = 0; r < ROWS; r++) {
+            for (let c = 0; c < COLS; c++) {
+                let x = c * CELL_W, y = r * CELL_H;
+                const id = r + "," + c;
+
+                if (grid[r][c] === 1) {
+                    ctx.fillStyle = '#333';
+                    ctx.fillRect(x, y, CELL_W - 1, CELL_H - 1);
+                } else if (path.includes(id)) {
+                    ctx.fillStyle = '#ffb703';
+                    ctx.fillRect(x, y, CELL_W - 1, CELL_H - 1);
+                } else if (visited.has(id)) {
+                    ctx.fillStyle = 'rgba(0, 255, 136, 0.4)';
+                    ctx.fillRect(x, y, CELL_W - 1, CELL_H - 1);
+
+                    if (fScore.has(id)) {
+                        ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+                        ctx.font = '8px Courier New';
+                        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                        ctx.fillText(fScore.get(id).toFixed(1), x + CELL_W / 2, y + CELL_H / 2);
+                    }
+                } else if (openSet.some(el => el.r === r && el.c === c)) {
+                    ctx.fillStyle = '#fff';
+                    ctx.fillRect(x, y, CELL_W - 1, CELL_H - 1);
+
+                    if (fScore.has(id)) {
+                        ctx.fillStyle = '#333';
+                        ctx.font = '8px Courier New';
+                        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                        ctx.fillText(fScore.get(id).toFixed(1), x + CELL_W / 2, y + CELL_H / 2);
+                    }
+                }
+            }
+        }
+
+        ctx.fillStyle = '#00ff00';
+        ctx.fillRect(startCell.c * CELL_W, startCell.r * CELL_H, CELL_W - 1, CELL_H - 1);
+        ctx.fillStyle = '#ff0000';
+        ctx.fillRect(targetCell.c * CELL_W, targetCell.r * CELL_H, CELL_W - 1, CELL_H - 1);
+
+        ctx.fillStyle = '#000';
+        ctx.font = 'bold 12px Courier New';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('S', startCell.c * CELL_W + CELL_W / 2, startCell.r * CELL_H + CELL_H / 2);
+        ctx.fillText('E', targetCell.c * CELL_W + CELL_W / 2, targetCell.r * CELL_H + CELL_H / 2);
+    }
+
+    function getNeighbors(r, c) {
+        let n = [];
+        const dirs = [[-1, 0], [0, 1], [1, 0], [0, -1], [-1, -1], [-1, 1], [1, 1], [1, -1]];
+
+        for (let d of dirs) {
+            let nr = r + d[0], nc = c + d[1];
+            if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS && grid[nr][nc] === 0) {
+                let isDiagonal = (d[0] !== 0 && d[1] !== 0);
+                let canMove = true;
+                if (isDiagonal) {
+                    if (grid[r + d[0]][c] === 1 || grid[r][c + d[1]] === 1) canMove = false;
+                }
+                if (canMove) n.push({ r: nr, c: nc, isDiagonal });
+            }
+        }
+        return n;
+    }
+
+    function stepSearch() {
+        if (openSet.length === 0) {
+            isSearching = false;
+            return;
+        }
+
+        let lowestIdx = 0;
+        let lowestId = openSet[0].r + "," + openSet[0].c;
+        let minF = fScore.get(lowestId);
+
+        for (let i = 1; i < openSet.length; i++) {
+            let id = openSet[i].r + "," + openSet[i].c;
+            let f = fScore.get(id) || Infinity;
+            if (f < minF) {
+                minF = f;
+                lowestIdx = i;
+            }
+        }
+
+        let current = openSet.splice(lowestIdx, 1)[0];
+        let currentId = current.r + "," + current.c;
+        visited.add(currentId);
+
+        if (current.r === targetCell.r && current.c === targetCell.c) {
+            let step = currentId;
+            while (step) {
+                path.push(step);
+                step = cameFrom.get(step);
+            }
+            path.reverse();
+            isSearching = false;
+            draw();
+            return;
+        }
+
+        let neighbors = getNeighbors(current.r, current.c);
+
+        for (let n of neighbors) {
+            let nid = n.r + "," + n.c;
+            if (visited.has(nid)) continue;
+
+            let moveCost = n.isDiagonal ? 1.414 : 1;
+            let tentative_gScore = gScore.get(currentId) + moveCost;
+
+            if (!openSet.some(el => el.r === n.r && el.c === n.c)) {
+                openSet.push(n);
+            } else if (tentative_gScore >= gScore.get(nid)) {
+                continue;
+            }
+
+            cameFrom.set(nid, currentId);
+            gScore.set(nid, tentative_gScore);
+            fScore.set(nid, tentative_gScore + heuristic(n.r, n.c));
+        }
+
+        draw();
+        if (isSearching) {
+            animId = setTimeout(stepSearch, 30);
+        }
+    }
+
+    function startSearch() {
+        resetSearch();
+        isSearching = true;
+        if (btnRun) btnRun.disabled = true;
+
+        let startId = startCell.r + "," + startCell.c;
+        openSet.push(startCell);
+        gScore.set(startId, 0);
+        fScore.set(startId, heuristic(startCell.r, startCell.c));
+
+        stepSearch();
+    }
+
+    if (btnRun) btnRun.addEventListener('click', startSearch);
+    if (btnReset) {
+        btnReset.addEventListener('click', () => {
+            initGrid();
+            resetSearch();
+        });
+    }
+
+    canvas.addEventListener('mousedown', (e) => {
+        if (isSearching) return;
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        const c = Math.floor(x / CELL_W);
+        const r = Math.floor(y / CELL_H);
+
+        if ((r === startCell.r && c === startCell.c) || (r === targetCell.r && c === targetCell.c)) return;
+
+        if (r >= 0 && r < ROWS && c >= 0 && c < COLS) {
+            grid[r][c] = grid[r][c] === 1 ? 0 : 1;
+            draw();
+        }
+    });
+
+    initGrid();
+    draw();
+})();
+
+// ==========================================
 // 13.5 SEEING THE FUTURE (MINIMAX)
 // ==========================================
 (function () {
