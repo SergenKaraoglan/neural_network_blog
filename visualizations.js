@@ -2988,7 +2988,7 @@
     // SGD Agent
     let sgd = {
         x: -2.5, y: 1.0,
-        lr: 0.05,
+        lr: 0.078,
         path: []
     };
 
@@ -3008,7 +3008,7 @@
     function resetAgents() {
         if (animId) cancelAnimationFrame(animId);
         t = 0;
-        sgd = { x: -2.5, y: 1.0, lr: 0.05, path: [] };
+        sgd = { x: -2.5, y: 1.0, lr: 0.078, path: [] };
         adam = { x: -2.5, y: 1.0, lr: 0.1, m_dx: 0, m_dy: 0, v_dx: 0, v_dy: 0, beta1: 0.9, beta2: 0.999, eps: 1e-8, path: [] };
         isRunning = false;
         draw();
