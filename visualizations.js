@@ -4663,6 +4663,228 @@
 })();
 
 // ==========================================
+// 38. EFFICIENCY AND SPIKES (SNN)
+// ==========================================
+(function () {
+    const canvas = document.getElementById('snnCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const injectBtn = document.getElementById('snn-inject-btn');
+    const autoBtn = document.getElementById('snn-auto-btn');
+
+    const W = canvas.width, H = canvas.height;
+
+    // LIF Model Parameters
+    const RESTING_POTENTIAL = 0;
+    const THRESHOLD = 100;
+    const LEAK_RATE = 0.95; // Decay multiplier per frame
+    const INJECTION_AMOUNT = 35;
+
+    let potential = RESTING_POTENTIAL;
+    let isSpiking = false;
+    let spikeTimer = 0;
+
+    // Graph history
+    let history = [];
+    const MAX_HISTORY = 150;
+    for (let i = 0; i < MAX_HISTORY; i++) history.push(RESTING_POTENTIAL);
+
+    // Visual layout
+    const GRAPH_W = 350;
+    const GRAPH_X = 20;
+    const NEURON_X = 450;
+    const NEURON_Y = H / 2;
+
+    let autoStim = false;
+    let lastTime = 0;
+
+    function drawNeuron() {
+        // Draw Axon
+        ctx.strokeStyle = '#444';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(NEURON_X, NEURON_Y);
+        ctx.lineTo(W - 20, NEURON_Y);
+        ctx.stroke();
+
+        // If spiking, draw a "pulse" moving down the axon
+        if (spikeTimer > 0) {
+            const progress = 1 - (spikeTimer / 20); // 0 to 1
+            const pulseX = NEURON_X + (W - 20 - NEURON_X) * progress;
+            ctx.fillStyle = '#ffb703';
+            ctx.beginPath();
+            ctx.arc(pulseX, NEURON_Y, 8, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#ffb703';
+            ctx.fill();
+            ctx.shadowBlur = 0;
+        }
+
+        // Draw Soma (Cell Body)
+        ctx.beginPath();
+        ctx.arc(NEURON_X, NEURON_Y, 30, 0, Math.PI * 2);
+
+        // Color based on potential
+        const intensity = Math.min(1, Math.max(0, potential / THRESHOLD));
+
+        if (isSpiking) {
+            ctx.fillStyle = '#fff';
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = '#00e5ff';
+        } else {
+            // Blend from dark grey to cyan
+            const r = Math.floor(34 + (0 - 34) * intensity);
+            const g = Math.floor(34 + (229 - 34) * intensity);
+            const b = Math.floor(34 + (255 - 34) * intensity);
+            ctx.fillStyle = `rgb(${r},${g},${b})`;
+            ctx.shadowBlur = intensity * 10;
+            ctx.shadowColor = '#00e5ff';
+        }
+
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = '#888';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Label
+        ctx.fillStyle = '#fff';
+        ctx.font = '10px Courier New';
+        ctx.textAlign = 'center';
+        ctx.fillText('SOMA', NEURON_X, NEURON_Y + 45);
+        ctx.fillText('AXON', NEURON_X + 70, NEURON_Y - 15);
+    }
+
+    function drawGraph() {
+        // Graph Box
+        ctx.fillStyle = '#111';
+        ctx.fillRect(GRAPH_X, H / 2 - 100, GRAPH_W, 200);
+        ctx.strokeStyle = '#444';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(GRAPH_X, H / 2 - 100, GRAPH_W, 200);
+
+        // Threshold Line
+        const yThreshold = H / 2 + 80 - (THRESHOLD / 120) * 160;
+        ctx.strokeStyle = '#ff0055';
+        ctx.setLineDash([5, 5]);
+        ctx.beginPath();
+        ctx.moveTo(GRAPH_X, yThreshold);
+        ctx.lineTo(GRAPH_X + GRAPH_W, yThreshold);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Resting Line
+        const yRest = H / 2 + 80;
+        ctx.strokeStyle = '#333';
+        ctx.beginPath();
+        ctx.moveTo(GRAPH_X, yRest);
+        ctx.lineTo(GRAPH_X + GRAPH_W, yRest);
+        ctx.stroke();
+
+        // Plot History
+        ctx.strokeStyle = '#00e5ff';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+
+        for (let i = 0; i < MAX_HISTORY; i++) {
+            const val = history[i];
+            const x = GRAPH_X + (i / (MAX_HISTORY - 1)) * GRAPH_W;
+            const y = H / 2 + 80 - (val / 120) * 160;
+
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+
+        // Labels
+        ctx.fillStyle = '#888';
+        ctx.font = '10px Courier New';
+        ctx.textAlign = 'left';
+        ctx.fillText('MEMBRANE POTENTIAL (mV)', GRAPH_X + 5, H / 2 - 85);
+        ctx.fillStyle = '#ff0055';
+        ctx.fillText('THRESHOLD', GRAPH_X + 5, yThreshold - 5);
+
+        // Link line from end of graph to neuron
+        const lastY = H / 2 + 80 - (history[MAX_HISTORY - 1] / 120) * 160;
+        ctx.strokeStyle = '#444';
+        ctx.setLineDash([2, 4]);
+        ctx.beginPath();
+        ctx.moveTo(GRAPH_X + GRAPH_W, lastY);
+        ctx.lineTo(NEURON_X - 30, NEURON_Y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+    }
+
+    function loop(timestamp) {
+        if (!lastTime) lastTime = timestamp;
+        const dt = timestamp - lastTime;
+        lastTime = timestamp;
+
+        // Auto stimulate
+        if (autoStim && Math.random() < 0.08) {
+            potential += INJECTION_AMOUNT;
+        }
+
+        // LIF Logic
+        if (isSpiking) {
+            potential = RESTING_POTENTIAL;
+            isSpiking = false;
+        } else {
+            // Leak
+            potential = potential * LEAK_RATE;
+
+            // Check threshold
+            if (potential >= THRESHOLD) {
+                isSpiking = true;
+                potential = 120; // Visual spike peak
+                spikeTimer = 20; // Frames for animation
+            }
+        }
+
+        if (spikeTimer > 0) spikeTimer--;
+
+        // Update history
+        history.push(potential);
+        history.shift();
+
+        // Render
+        ctx.fillStyle = '#0f0f0f';
+        ctx.fillRect(0, 0, W, H);
+
+        drawGraph();
+        drawNeuron();
+
+        animId = requestAnimationFrame(loop);
+    }
+
+    let animId = requestAnimationFrame(loop);
+
+    // Interaction
+    if (injectBtn) {
+        injectBtn.addEventListener('click', () => {
+            potential += INJECTION_AMOUNT;
+        });
+    }
+
+    if (autoBtn) {
+        autoBtn.addEventListener('click', () => {
+            autoStim = !autoStim;
+            if (autoStim) {
+                autoBtn.innerText = 'STOP STIMULATING';
+                autoBtn.style.color = '#ff0055';
+                autoBtn.style.borderColor = '#ff0055';
+            } else {
+                autoBtn.innerText = 'AUTO STIMULATE';
+                autoBtn.style.color = '#000';
+                autoBtn.style.borderColor = 'transparent';
+            }
+        });
+    }
+
+})();
+
+// ==========================================
 // 13.5 SEEING THE FUTURE (MINIMAX)
 // ==========================================
 (function () {
